@@ -1,0 +1,1375 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+</head>
+<body>
+<title>Semiconductors Tinkering</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bai+Jamjuree:wght@500;600;700&family=IBM+Plex+Sans+Thai:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a lab notebook — fixed index rail on the left (wafer map of posts), one reading column on the right; rail folds into a top bar on phones. */
+:root {
+  --bg: #f4f6f4;
+  --surface: #ffffff;
+  --ink: #16201b;
+  --muted: #56645d;
+  --line: #d6ddd8;
+  --accent: #0a7354;        /* solder-mask green */
+  --accent-soft: #0a735414;
+  --copper: #a85a1f;        /* copper interconnect */
+  --copper-soft: #a85a1f1a;
+  --chart-muted: #9aa6a0;
+  --font-display: "Bai Jamjuree", "IBM Plex Sans Thai", "Noto Sans Thai", sans-serif;
+  --font-body: "IBM Plex Sans Thai", "Noto Sans Thai", "Leelawadee UI", Tahoma, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --rail: 288px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1412; --surface: #151d1a; --ink: #e4ebe7; --muted: #9babA3; --line: #29342f;
+    --accent: #43c99a; --accent-soft: #43c99a1c; --copper: #e0995c; --copper-soft: #e0995c22;
+    --chart-muted: #5f6d67; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1412; --surface: #151d1a; --ink: #e4ebe7; --muted: #9babA3; --line: #29342f;
+  --accent: #43c99a; --accent-soft: #43c99a1c; --copper: #e0995c; --copper-soft: #e0995c22;
+  --chart-muted: #5f6d67; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 16px; line-height: 1.75;
+}
+a { color: var(--accent); text-underline-offset: 3px; }
+a:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+.shell { display: grid; grid-template-columns: var(--rail) minmax(0, 1fr); min-height: 100%; }
+
+/* ---------- rail ---------- */
+.rail {
+  position: sticky; top: env(safe-area-inset-top, 0px); align-self: start;
+  height: calc(100vh - env(safe-area-inset-top, 0px) - env(safe-area-inset-bottom, 0px));
+  overflow-y: auto; border-right: 1px solid var(--line); background: var(--surface);
+  padding-block: 28px; padding-left: max(20px, env(safe-area-inset-left, 0px)); padding-right: 20px;
+  display: flex; flex-direction: column; gap: 28px;
+}
+.brand { display: flex; flex-direction: column; gap: 4px; text-decoration: none; color: var(--ink); }
+.brand-name { font-family: var(--font-display); font-weight: 700; font-size: 1.25rem; line-height: 1.2; }
+.brand-sub { font-size: .8rem; color: var(--muted); line-height: 1.5; }
+.nav-label { font-family: var(--font-body); font-weight: 600; font-size: .75rem; letter-spacing: .02em; color: var(--muted); }
+.nav { display: flex; flex-direction: column; gap: 4px; }
+.nav a {
+  display: grid; grid-template-columns: 34px 1fr; gap: 10px; align-items: start;
+  padding: 10px 10px; border-radius: 8px; text-decoration: none; color: var(--ink);
+  line-height: 1.45; font-size: .92rem;
+}
+.nav a:hover { background: var(--accent-soft); }
+.nav a[aria-current="page"] { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav .no { font-family: var(--font-mono); font-size: .75rem; color: var(--muted); padding-top: 2px; }
+.nav a[aria-current="page"] .no { color: var(--accent); }
+.nav .date { display: block; font-size: .76rem; color: var(--muted); font-weight: 400; }
+.toc { display: flex; flex-direction: column; gap: 2px; border-left: 1px solid var(--line); }
+.toc button {
+  all: unset; cursor: pointer; padding: 4px 0 4px 14px; margin-left: -1px; border-left: 2px solid transparent;
+  font-size: .85rem; color: var(--muted); line-height: 1.45;
+}
+.toc button:hover { color: var(--ink); border-left-color: var(--line); }
+.toc button.on { color: var(--accent); border-left-color: var(--accent); }
+.toc-wrap[hidden] { display: none !important; }
+.toc-wrap { display: flex; flex-direction: column; gap: 10px; }
+
+/* ---------- main ---------- */
+main {
+  min-width: 0;
+  padding-block: 48px 96px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.col { max-width: 760px; margin-inline: auto; display: flex; flex-direction: column; gap: 20px; }
+article[hidden] { display: none !important; }
+.eyebrow { font-family: var(--font-body); font-weight: 600; font-size: .82rem; letter-spacing: .02em; color: var(--copper); }
+h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; line-height: 1.3; margin: 0; }
+h1 { font-size: clamp(1.8rem, 4vw, 2.5rem); font-weight: 700; }
+h2 { font-size: 1.5rem; font-weight: 600; padding-top: 28px; margin-top: 8px; border-top: 1px solid var(--line); scroll-margin-top: 24px; }
+h3 { font-size: 1.12rem; font-weight: 600; padding-top: 8px; }
+p { margin: 0; }
+.lede { font-size: 1.1rem; color: var(--ink); }
+.meta { display: flex; flex-wrap: wrap; gap: 8px 18px; font-size: .85rem; color: var(--muted); align-items: center; }
+.meta .src { font-family: var(--font-mono); font-size: .78rem; }
+ul, ol { margin: 0; padding-left: 1.4em; display: flex; flex-direction: column; gap: 8px; }
+strong { font-weight: 600; }
+.note {
+  background: var(--copper-soft); border-radius: 8px; padding: 14px 16px; font-size: .92rem; color: var(--ink);
+}
+.note b { color: var(--copper); }
+
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: .9rem; line-height: 1.55; }
+th, td { text-align: left; vertical-align: top; padding: 10px 14px; border-bottom: 1px solid var(--line); }
+th { font-weight: 600; font-size: .8rem; color: var(--muted); background: var(--bg); white-space: nowrap; }
+tr:last-child td { border-bottom: 0; }
+td.num, th.num { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.wide table { min-width: 680px; }
+.tag { display: inline-block; font-size: .75rem; padding: 1px 8px; border-radius: 99px; white-space: nowrap; }
+.tag.no-find { background: var(--copper-soft); color: var(--copper); }
+.tag.no-pay { background: var(--accent-soft); color: var(--accent); }
+.tag.ok { background: var(--accent); color: var(--surface); }
+
+/* stack diagrams */
+figure { margin: 8px 0; display: flex; flex-direction: column; gap: 12px; }
+figcaption { font-size: .82rem; color: var(--muted); }
+.stack { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+.stack .lvl {
+  border: 1px solid var(--line); border-radius: 8px; background: var(--surface);
+  padding: 10px 14px; text-align: center; width: 100%;
+}
+.stack .lvl b { display: block; font-family: var(--font-display); font-weight: 600; font-size: .98rem; }
+.stack .lvl span { font-size: .82rem; color: var(--muted); }
+.stack .lvl.hot { border: 2px solid var(--accent); background: var(--accent-soft); }
+.pyramid .lvl:nth-child(1) { width: 40%; } .pyramid .lvl:nth-child(2) { width: 55%; }
+.pyramid .lvl:nth-child(3) { width: 70%; } .pyramid .lvl:nth-child(4) { width: 85%; }
+.pyramid .lvl:nth-child(5) { width: 100%; }
+@media (max-width: 560px) { .pyramid .lvl { width: 100% !important; } }
+.layers { display: flex; flex-direction: column; gap: 6px; }
+.layers .lvl { text-align: left; display: grid; grid-template-columns: 34px 1fr; gap: 12px; align-items: baseline; }
+.layers .lvl .n { font-family: var(--font-mono); color: var(--copper); font-size: .9rem; }
+.layers .lvl.hot .n { color: var(--accent); }
+.arrow-down { color: var(--chart-muted); font-size: .8rem; line-height: 1; }
+
+/* company cards */
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 330px), 1fr)); gap: 14px; }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 16px 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.card h3 { padding: 0; font-size: 1.05rem; }
+.card .tagline { font-size: .82rem; color: var(--copper); font-weight: 500; }
+.card dl { margin: 0; display: flex; flex-direction: column; gap: 8px; font-size: .88rem; line-height: 1.6; }
+.card dt { font-weight: 600; font-size: .78rem; color: var(--muted); }
+.card dd { margin: 0; }
+
+/* home */
+.posts { display: flex; flex-direction: column; gap: 14px; }
+.post-link {
+  display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 16px; text-decoration: none; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px;
+}
+.post-link:hover { border-color: var(--accent); }
+.post-link .big { font-family: var(--font-display); font-weight: 700; font-size: 2rem; color: var(--accent); line-height: 1; }
+.post-link h3 { padding: 0 0 4px; }
+.post-link p { font-size: .92rem; color: var(--muted); }
+.post-link .d { font-size: .78rem; color: var(--muted); margin-top: 8px; display: block; }
+.path { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 200px), 1fr)); gap: 10px; }
+.path div { border-top: 2px solid var(--copper); padding-top: 10px; font-size: .9rem; }
+.path b { display: block; font-family: var(--font-display); }
+
+.pager { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding-top: 24px; border-top: 1px solid var(--line); margin-top: 16px; }
+.pager a { text-decoration: none; font-size: .9rem; display: flex; flex-direction: column; max-width: 48%; }
+.pager a span { font-size: .78rem; color: var(--muted); }
+.pager a.next { text-align: right; margin-left: auto; }
+
+/* charts */
+.chart-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px 8px 8px; }
+.chart-wrap svg { display: block; min-width: 640px; width: 100%; height: auto; }
+.chart-title { font-family: var(--font-display); font-weight: 600; font-size: 1rem; }
+svg text { font-family: var(--font-body); }
+
+/* phone */
+@media (max-width: 880px) {
+  .shell { grid-template-columns: minmax(0, 1fr); }
+  .rail {
+    position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5; height: auto; overflow: visible;
+    border-right: 0; border-bottom: 1px solid var(--line);
+    padding-block: 12px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+    gap: 8px;
+  }
+  body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 10; background: var(--surface); }
+  .brand-sub, .rail .nav-label, .toc-wrap { display: none !important; }
+  .brand-name { font-size: 1.05rem; }
+  .nav { flex-direction: row; overflow-x: auto; gap: 6px; scrollbar-width: none; }
+  .nav a { grid-template-columns: auto; white-space: nowrap; padding: 6px 12px; border: 1px solid var(--line); border-radius: 99px; font-size: .85rem; }
+  .nav .no, .nav .date { display: none; }
+  main { padding-block: 28px 72px; }
+  h2 { scroll-margin-top: 110px; }
+}
+
+/* language */
+body[data-lang="en"] .t-th, body:not([data-lang="en"]) .t-en { display: none; }
+.lang {
+  display: inline-flex; align-self: flex-start; padding: 3px; gap: 2px; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 99px; background: var(--bg); font: inherit;
+}
+.lang span { padding: 3px 12px; border-radius: 99px; font-size: .8rem; font-weight: 600; color: var(--muted); }
+.lang span.on { background: var(--accent); color: var(--surface); }
+.lang:hover { border-color: var(--accent); }
+@media (max-width: 880px) {
+  .rail .brand { flex-direction: row; }
+  .lang { position: absolute; top: 8px; right: max(16px, env(safe-area-inset-right, 0px)); }
+  .lang span { padding: 1px 10px; font-size: .75rem; }
+}
+@media (prefers-reduced-motion: no-preference) { html { scroll-behavior: smooth; } }
+</style>
+
+<div class="shell">
+  <aside class="rail">
+    <a class="brand" href="#home">
+      <span class="brand-name">Semiconductors Tinkering</span>
+      <span class="brand-sub"><span class="t-th">บันทึกการเรียนรู้เรื่องชิปและเซมิคอนดักเตอร์ สำหรับคนทั่วไปและนักทดลอง</span><span class="t-en">Notes on chips and semiconductors for everyday people and tinkerers</span></span>
+    </a>
+    <button type="button" class="lang" id="lang-toggle" aria-label="Switch to English"><span data-l="th">ไทย</span><span data-l="en">EN</span></button>
+    <div style="display:flex;flex-direction:column;gap:8px">
+      <span class="nav-label"><span class="t-th">บทความ</span><span class="t-en">Posts</span></span>
+      <nav class="nav" id="nav">
+        <a href="#home" data-page="home"><span class="no">00</span><span><span class="t-th">หน้าแรก</span><span class="t-en">Home</span></span></a>
+        <a href="#memory" data-page="memory"><span class="no">01</span><span><span class="t-th">RAM และ SSD กับผู้เล่นในตลาด</span><span class="t-en">RAM, SSD and the market players</span><span class="date"><span class="t-th">16 ต.ค. 2026</span><span class="t-en">16 Oct 2026</span></span></span></a>
+        <a href="#design" data-page="design"><span class="no">02</span><span><span class="t-th">ออกแบบชิประดับสูงอย่างไร</span><span class="t-en">How advanced chips are designed</span><span class="date"><span class="t-th">23 ต.ค. 2026</span><span class="t-en">23 Oct 2026</span></span></span></a>
+        <a href="#market" data-page="market"><span class="no">03</span><span><span class="t-th">ประเภทชิป การสร้าง และอุปสงค์-อุปทาน</span><span class="t-en">Chip types, building and supply vs demand</span><span class="date"><span class="t-th">4 พ.ย. 2026</span><span class="t-en">4 Nov 2026</span></span></span></a>
+      </nav>
+    </div>
+    <div class="toc-wrap" id="toc-wrap" hidden>
+      <span class="nav-label"><span class="t-th">ในหน้านี้</span><span class="t-en">On this page</span></span>
+      <div class="toc" id="toc"></div>
+    </div>
+  </aside>
+
+  <main>
+  <!-- ================= HOME ================= -->
+  <article data-page="home" data-lang="th" class="col">
+    <span class="eyebrow">รวมรายงาน · 3 ตอน</span>
+    <h1>จากทรายสู่ชิป: เรียนรู้เซมิคอนดักเตอร์ทีละเรื่อง</h1>
+    <p class="lede">หน้านี้รวมรายงานทั้งหมดที่ทำไว้ในโปรเจกต์ Semiconductors Tinkering เป็นบล็อกเดียว กดเลือกตอนจากเมนูด้านซ้าย (หรือแถบด้านบนบนมือถือ) เพื่อสลับหน้าได้เลย</p>
+
+    <div class="posts">
+      <a class="post-link" href="#memory">
+        <span class="big">01</span>
+        <div><h3>RAM และ SSD: เทคโนโลยี ประเภท และผู้เล่นหลักในตลาดหน่วยความจำ</h3>
+        <p>RAM กับ SSD ต่างกันอย่างไร ต่างจาก Cache ตรงไหน มีกี่ประเภท ส่วนแบ่งตลาด DRAM/NAND ไตรมาส 2/2026 และโปรไฟล์ 7 บริษัทหน่วยความจำ</p>
+        <span class="d">16 ต.ค. 2026</span></div>
+      </a>
+      <a class="post-link" href="#design">
+        <span class="big">02</span>
+        <div><h3>ออกแบบชิประดับสูงอย่างไร: เครื่องมือ ทีม และการพัฒนาทุกปี</h3>
+        <p>เครื่องมือ EDA ที่ใช้ ขั้นตอนจากสเปกถึง tape-out การแบ่งทีม ทำไมชิปดีขึ้นทุกปี ข้อจำกัด PPA และกรณีศึกษา A19 Pro, M5, Threadripper, GB10</p>
+        <span class="d">23 ต.ค. 2026</span></div>
+      </a>
+      <a class="post-link" href="#market">
+        <span class="big">03</span>
+        <div><h3>ชิปตามฟังก์ชัน การสร้าง และอุปสงค์-อุปทาน</h3>
+        <p>ชิป 12 หมวดตามปัญหาที่แก้ โครงสร้าง 8 ชั้นจากทรายถึงซอฟต์แวร์ กราฟอุปทานต่ออุปสงค์ปี 2023–2028 และเทคโนโลยีที่ยังไปไม่ถึง</p>
+        <span class="d">4 พ.ย. 2026</span></div>
+      </a>
+    </div>
+
+    <h2 id="home-path">ลำดับการอ่านที่แนะนำสำหรับมือใหม่</h2>
+    <p>ตอนต่างๆ เขียนตามลำดับคำถามที่ถามมา แต่ถ้าเริ่มจากศูนย์ ลำดับนี้จะต่อกันได้ลื่นกว่า</p>
+    <div class="path">
+      <div><b>เริ่มที่ตอน 03</b>เห็นภาพรวมว่าชิปมีกี่แบบ สร้างกันกี่ชั้น และตลาดขาดอะไร</div>
+      <div><b>ต่อด้วยตอน 02</b>ลงลึกว่าชิปหนึ่งตัวถูกออกแบบอย่างไร ใช้เครื่องมือและทีมแบบไหน</div>
+      <div><b>ปิดท้ายตอน 01</b>เจาะหน่วยความจำ ซึ่งเป็นคอขวดสำคัญที่สุดของยุค AI</div>
+    </div>
+
+    <h2 id="home-common">ภาพที่ทั้งสามตอนเห็นตรงกัน</h2>
+    <ul>
+      <li><strong>AI คือแรงดึงหลักของอุตสาหกรรม</strong> ทั้งชิปเร่ง AI, HBM, CoWoS และ SSD องค์กรความจุสูงยังขาดตลาดในปี 2026</li>
+      <li><strong>คอขวดย้ายจากตัวคำนวณไปที่หน่วยความจำและแพ็กเกจ</strong> (memory wall) และหลังปี 2027 น่าจะย้ายไปที่ไฟฟ้าและความร้อนของศูนย์ข้อมูล</li>
+      <li><strong>ชิปดีขึ้นจากหลายคันโยกพร้อมกัน</strong> ไม่ใช่แค่ทรานซิสเตอร์เล็กลง แต่รวมถึงสถาปัตยกรรม chiplet และ packaging</li>
+      <li><strong>คนทั่วไปลงมือได้จริง</strong> ผ่าน MCU, FPGA และเครื่องมือ open-source ไปจนถึงส่งผลิตชิปจริงกับ Tiny Tapeout</li>
+    </ul>
+
+    <p class="note"><b>เรื่องตัวเลข:</b> ตัวเลขส่วนใหญ่เป็นค่าประมาณจากรายงานสาธารณะถึงกลางปี 2026 ยกเว้นส่วนแบ่งตลาด DRAM/NAND ในตอน 01 ที่อ้างอิง TrendForce โดยตรง ควรตรวจกับแหล่งต้นฉบับก่อนนำไปอ้างอิงทางการ</p>
+  </article>
+
+  <!-- ================= POST 1: MEMORY ================= -->
+  <article data-page="memory" data-lang="th" class="col" hidden>
+    <span class="eyebrow">ตอนที่ 01 · หน่วยความจำ</span>
+    <h1>RAM และ SSD: เทคโนโลยี ประเภท และผู้เล่นหลักในตลาดหน่วยความจำ</h1>
+    <div class="meta"><span>16 ต.ค. 2026</span><a class="src" href="https://claude.ai/artifact/SbCcnUjmNiEuDPVaAAvnJh" target="_blank" rel="noopener">เอกสารต้นฉบับ ↗</a></div>
+
+    <h2 id="m-what">RAM และ SSD คืออะไร ใช้ทำอะไรในปัจจุบัน</h2>
+    <p class="lede">RAM คือ "โต๊ะทำงาน" ของคอมพิวเตอร์ ส่วน SSD คือ "ตู้เก็บเอกสาร" RAM เร็วมากแต่ข้อมูลหายเมื่อปิดไฟ SSD ช้ากว่าแต่เก็บข้อมูลได้ถาวร</p>
+    <ul>
+      <li><strong>RAM (Random Access Memory)</strong> เป็นหน่วยความจำหลักที่ CPU/GPU ใช้พักข้อมูลและโปรแกรมที่กำลังทำงานอยู่ ส่วนใหญ่เป็นชิป DRAM ซึ่งเก็บบิตเป็นประจุในตัวเก็บประจุเล็กๆ ต้องรีเฟรชหลายครั้งต่อวินาที และข้อมูลหายเมื่อไม่มีไฟ (volatile)</li>
+      <li><strong>SSD (Solid State Drive)</strong> เป็นที่เก็บข้อมูลถาวร ใช้ชิป NAND Flash ที่ขังอิเล็กตรอนไว้ในเซลล์ จึงจำข้อมูลได้แม้ไม่มีไฟ (non-volatile) ภายในมีชิปคอนโทรลเลอร์ที่จัดการการเขียนกระจาย (wear leveling) แก้ข้อผิดพลาด (ECC) และมักมี DRAM เล็กๆ เป็นบัฟเฟอร์</li>
+    </ul>
+    <div class="table-wrap"><table>
+      <tr><th>การใช้งาน</th><th>บทบาทของ RAM</th><th>บทบาทของ SSD</th></tr>
+      <tr><td>คอมพิวเตอร์/โน้ตบุ๊ก</td><td>เปิดหลายแอปพร้อมกันได้ลื่น (ปกติ 16–32 GB)</td><td>บูตเครื่องและโหลดเกมเร็ว (NVMe 1–2 TB)</td></tr>
+      <tr><td>สมาร์ทโฟน</td><td>LPDDR 8–16 GB ให้ AI ในเครื่องและสลับแอปเร็ว</td><td>UFS เก็บรูป วิดีโอ แอป</td></tr>
+      <tr><td>ศูนย์ข้อมูล / AI</td><td>HBM ติดกับ GPU ป้อนข้อมูลให้โมเดล AI, DDR5 ใน server</td><td>Enterprise SSD ความจุสูง (60–120 TB+) เก็บข้อมูลฝึก AI และฐานข้อมูล</td></tr>
+      <tr><td>รถยนต์</td><td>LPDDR ในระบบช่วยขับขี่และจอ infotainment</td><td>เก็บแผนที่ ซอฟต์แวร์ และข้อมูลกล้อง</td></tr>
+      <tr><td>เครื่องใช้ทั่วไป</td><td>DRAM ในทีวี เราเตอร์ เครื่องเล่นเกม</td><td>eMMC/NAND ในกล้อง ทีวี IoT การ์ด SD แฟลชไดรฟ์</td></tr>
+    </table></div>
+    <p>กระแสสำคัญปี 2024–2026 คือ AI ทำให้ความต้องการ HBM และ SSD องค์กรความจุสูงพุ่งขึ้นมาก จนชิปหน่วยความจำกลายเป็นคอขวดของศูนย์ข้อมูล AI และราคา DRAM/NAND ทั่วไปปรับขึ้นตามไปด้วย</p>
+
+    <h2 id="m-types">ประเภทของ RAM และ SSD</h2>
+    <p>RAM แบ่งตามเทคโนโลยีเซลล์ (SRAM/DRAM) และตามมาตรฐานการใช้งาน ส่วน SSD แบ่งตามจำนวนบิตต่อเซลล์ อินเทอร์เฟซ และรูปทรง</p>
+    <h3>ประเภท RAM</h3>
+    <div class="table-wrap"><table>
+      <tr><th>ประเภท</th><th>ลักษณะ</th><th>ใช้ที่ไหน</th></tr>
+      <tr><td>SRAM</td><td>ใช้ทรานซิสเตอร์ 6 ตัวต่อบิต เร็วมาก ไม่ต้องรีเฟรช แต่แพงและกินพื้นที่</td><td>Cache ใน CPU/GPU</td></tr>
+      <tr><td>DDR4 / DDR5</td><td>DRAM มาตรฐานสำหรับ PC และ server, DDR5 เร็วประมาณ 4800–8000+ MT/s</td><td>เดสก์ท็อป โน้ตบุ๊ก เซิร์ฟเวอร์ (RDIMM)</td></tr>
+      <tr><td>LPDDR4X / LPDDR5X</td><td>DRAM กินไฟต่ำ บัดกรีติดบอร์ด</td><td>มือถือ แท็บเล็ต โน้ตบุ๊กบาง รถยนต์</td></tr>
+      <tr><td>GDDR6 / GDDR7</td><td>DRAM แบนด์วิดท์สูงสำหรับกราฟิก</td><td>การ์ดจอ เครื่องเล่นเกม</td></tr>
+      <tr><td>HBM (HBM3E / HBM4)</td><td>นำ DRAM หลายชั้นมาซ้อนกันด้วย TSV วางติด GPU ให้แบนด์วิดท์ระดับ TB/s</td><td>AI accelerator เช่น NVIDIA, AMD, Google TPU</td></tr>
+      <tr><td>CXL Memory</td><td>ขยายหน่วยความจำผ่านบัส PCIe ให้หลาย CPU ใช้ร่วมกัน</td><td>ศูนย์ข้อมูลรุ่นใหม่</td></tr>
+    </table></div>
+    <h3>ประเภท SSD</h3>
+    <div class="table-wrap"><table>
+      <tr><th>มิติ</th><th>ตัวเลือก</th><th>ความต่าง</th></tr>
+      <tr><td>เซลล์ NAND</td><td>SLC (1 บิต), MLC (2), TLC (3), QLC (4), PLC (5, กำลังวิจัย)</td><td>บิตมากขึ้น = จุมากและถูกลง แต่ช้าและเขียนซ้ำได้น้อยลง</td></tr>
+      <tr><td>โครงสร้าง</td><td>2D NAND → 3D NAND (ซ้อน 200–300+ ชั้น)</td><td>ซ้อนสูงขึ้นแทนการย่อเซลล์</td></tr>
+      <tr><td>อินเทอร์เฟซ</td><td>SATA (~550 MB/s), NVMe PCIe 4.0 (~7 GB/s), PCIe 5.0 (~14 GB/s)</td><td>NVMe เร็วกว่า SATA หลายเท่า</td></tr>
+      <tr><td>รูปทรง</td><td>2.5 นิ้ว, M.2, U.2/U.3, E1.S/E3.S, ชิป BGA</td><td>ตามเครื่อง: PC, โน้ตบุ๊ก, เซิร์ฟเวอร์</td></tr>
+      <tr><td>กลุ่มตลาด</td><td>Client, Enterprise, Data center, Embedded (UFS/eMMC)</td><td>องค์กรเน้นความทนทานและความเสถียรของ latency</td></tr>
+    </table></div>
+
+    <h2 id="m-cache">ต่างจาก Cache อย่างไร</h2>
+    <p>Cache คือหน่วยความจำ SRAM ขนาดเล็กที่อยู่ในชิป CPU เอง ทำหน้าที่เก็บสำเนาข้อมูลจาก RAM ที่เพิ่งใช้หรือกำลังจะใช้ เพื่อให้ CPU ไม่ต้องรอ RAM ซึ่งช้ากว่าหลายสิบเท่า ทั้งสามอย่างจึงไม่ได้แข่งกัน แต่ทำงานเป็นชั้นต่อกัน</p>
+    <figure>
+      <div class="chart-title">Cache อยู่ใกล้ CPU ที่สุด เร็วที่สุดแต่จุน้อยที่สุด</div>
+      <div class="stack pyramid">
+        <div class="lvl"><b>Register ใน CPU</b><span>ไม่กี่ KB · น้อยกว่า 1 ns</span></div>
+        <div class="lvl hot"><b>Cache L1 / L2 / L3 (SRAM ในชิป CPU)</b><span>KB ถึงหลายสิบ MB · ราว 1–40 ns</span></div>
+        <div class="lvl"><b>RAM (DRAM: DDR5, LPDDR5X, HBM)</b><span>8–128 GB · ราว 80–100 ns · ปิดไฟข้อมูลหาย</span></div>
+        <div class="lvl"><b>SSD (NAND Flash)</b><span>0.5–8 TB · ราว 20–100 µs · เก็บข้อมูลถาวร</span></div>
+        <div class="lvl"><b>HDD / คลาวด์</b><span>หลาย TB ขึ้นไป · หลายมิลลิวินาที · ถูกที่สุดต่อ GB</span></div>
+      </div>
+      <figcaption>ลำดับชั้นหน่วยความจำ ค่าโดยประมาณของเครื่องทั่วไป ยิ่งลงล่างยิ่งจุมาก ถูกลง และช้าลง</figcaption>
+    </figure>
+    <p>เมื่อ CPU ต้องการข้อมูล จะหาใน Cache ก่อน (cache hit) ถ้าไม่เจอจึงไปที่ RAM และถ้า RAM ไม่มีจึงโหลดจาก SSD คำว่า "cache" ยังใช้ในความหมายกว้างด้วย เช่น DRAM cache หรือ SLC cache ภายใน SSD ซึ่งเป็นพื้นที่เร็วที่พักข้อมูลก่อนเขียนลง NAND จริง</p>
+    <div class="table-wrap"><table>
+      <tr><th>ประเด็น</th><th>Cache</th><th>RAM</th><th>SSD</th></tr>
+      <tr><td>เทคโนโลยี</td><td>SRAM</td><td>DRAM</td><td>NAND Flash</td></tr>
+      <tr><td>อยู่ที่ไหน</td><td>ในชิป CPU/GPU</td><td>แผงบนเมนบอร์ด หรือติด GPU (HBM)</td><td>ไดรฟ์ M.2 / 2.5 นิ้ว</td></tr>
+      <tr><td>ใครจัดการ</td><td>ฮาร์ดแวร์อัตโนมัติ</td><td>ระบบปฏิบัติการ</td><td>ระบบไฟล์ + คอนโทรลเลอร์ SSD</td></tr>
+      <tr><td>ปิดไฟแล้ว</td><td>หาย</td><td>หาย</td><td>อยู่ครบ</td></tr>
+      <tr><td>อัปเกรดเองได้ไหม</td><td>ไม่ได้ (ต้องเปลี่ยน CPU)</td><td>ได้ ถ้าไม่ได้บัดกรีติดบอร์ด</td><td>ได้</td></tr>
+    </table></div>
+
+    <h2 id="m-market">ภาพรวมตลาดและผู้เล่นหลัก</h2>
+    <p>ตลาด DRAM ไตรมาส 2/2026 มีมูลค่าราว 154,700 ล้านดอลลาร์ โต 59.5% จากไตรมาสก่อน ส่วน NAND เฉพาะ 5 รายแรกอยู่ที่ราว 68,900 ล้านดอลลาร์ โต 77% เพราะอุปทานตามความต้องการเซิร์ฟเวอร์ AI ไม่ทัน ราคาจึงพุ่ง ตลาดนี้เป็นการแข่งขันของผู้เล่นไม่กี่ราย (oligopoly) เพราะโรงงานหนึ่งแห่งใช้เงินหลายหมื่นล้านดอลลาร์</p>
+    <h3>DRAM ไตรมาส 2/2026 (เม.ย.–มิ.ย.)</h3>
+    <div class="table-wrap"><table>
+      <tr><th>บริษัท</th><th>ประเทศ</th><th class="num">รายได้ (พันล้าน USD)</th><th class="num">ส่วนแบ่ง (%)</th></tr>
+      <tr><td>Samsung</td><td>เกาหลีใต้</td><td class="num">60.98</td><td class="num">39.4</td></tr>
+      <tr><td>SK hynix</td><td>เกาหลีใต้</td><td class="num">38.59</td><td class="num">24.9</td></tr>
+      <tr><td>Micron</td><td>สหรัฐฯ</td><td class="num">36.00</td><td class="num">23.3</td></tr>
+      <tr><td>CXMT</td><td>จีน</td><td class="num">14.62</td><td class="num">9.5</td></tr>
+      <tr><td>Nanya</td><td>ไต้หวัน</td><td class="num">2.61</td><td class="num">1.7</td></tr>
+      <tr><td>Winbond และอื่นๆ</td><td>ไต้หวัน ฯลฯ</td><td class="num">1.92</td><td class="num">1.2</td></tr>
+    </table></div>
+    <p class="meta">ที่มา: <a href="https://evertiq.com/news/2026-09-07-dram-industry-revenue-surges-595-in-q2-as-supply-lags-demand" target="_blank" rel="noopener">TrendForce ผ่าน Evertiq</a></p>
+    <h3>NAND ไตรมาส 2/2026</h3>
+    <div class="table-wrap"><table>
+      <tr><th>บริษัท</th><th>ประเทศ</th><th class="num">รายได้ (พันล้าน USD)</th><th>หมายเหตุ</th></tr>
+      <tr><td>Samsung</td><td>เกาหลีใต้</td><td class="num">23.06</td><td>ส่วนแบ่ง 29.3% อันดับ 1</td></tr>
+      <tr><td>SK hynix + Solidigm</td><td>เกาหลีใต้ / สหรัฐฯ</td><td class="num">14.27</td><td>QLC องค์กรขายดี</td></tr>
+      <tr><td>Micron</td><td>สหรัฐฯ</td><td class="num">11.85</td><td>โตเร็วสุด +99% ขึ้นอันดับ 3</td></tr>
+      <tr><td>Kioxia</td><td>ญี่ปุ่น</td><td class="num">10.72</td><td>ส่วนแบ่ง 13.6%</td></tr>
+      <tr><td>SanDisk</td><td>สหรัฐฯ</td><td class="num">8.97</td><td>แยกจาก WD ปี 2025</td></tr>
+    </table></div>
+    <p class="meta">ที่มา: <a href="https://www.trendforce.com/presscenter/news/20260818-13186.html" target="_blank" rel="noopener">TrendForce</a></p>
+    <p>นอกจากผู้ผลิตชิป ยังมี YMTC (จีน) ผู้ผลิต NAND รายที่โตเร็ว และแบรนด์ประกอบโมดูลที่ซื้อชิปมาทำแรม/SSD เช่น Kingston, ADATA, Corsair, G.Skill, Lexar ซึ่งคนทั่วไปเห็นบ่อยในร้าน IT</p>
+
+    <h2 id="m-companies">โปรไฟล์บริษัท</h2>
+    <p>ทุกรายรอดมาได้ด้วยสูตรเดียวกัน คือลงทุนสวนวัฏจักรตอนตลาดตก และเกาะลูกค้ารายใหญ่ที่กำลังจะโต ข้อมูลประวัติด้านล่างสรุปจากความรู้ทั่วไป ตัวเลขปีและมูลค่าเป็นค่าโดยประมาณ</p>
+    <div class="cards">
+      <div class="card"><h3>Samsung Electronics</h3><span class="tagline">เกาหลีใต้ · ทำทั้ง DRAM และ NAND ใหญ่สุดในโลก</span><dl>
+        <dt>ประวัติ</dt><dd>ปี 1983 ประธาน Lee Byung-chul ประกาศเข้าสู่ธุรกิจชิป ("Tokyo Declaration") ทำ DRAM 64Kb ได้ในปีเดียวกัน เป็นอันดับ 1 DRAM ตั้งแต่ปี 1992 และ NAND ตั้งแต่ปี 2002 ปี 2013 เป็นรายแรกที่ผลิต 3D NAND (V-NAND) เชิงพาณิชย์</dd>
+        <dt>คุณค่าองค์กร</dt><dd>People, Excellence, Change, Integrity, Co-prosperity และคำพูดของ Lee Kun-hee ปี 1993 "เปลี่ยนทุกอย่าง ยกเว้นภรรยาและลูก"</dd>
+        <dt>งานวิจัย</dt><dd>HBM4/HBM4E, DDR5 และ LPDDR5X บนกระบวนการ 1c nm, V-NAND ชั้นสูง, CXL memory, Processing-in-Memory (PIM)</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>ลงทุนเพิ่มตอนตลาดตกช่วง 2007–2012 ("chicken game") จนคู่แข่ง Qimonda ล้มปี 2009 และ Elpida ล้มปี 2012 ช่วง 2024–2025 พลาดจังหวะ HBM ผ่านการทดสอบของ NVIDIA ช้า จนเสียอันดับ 1 DRAM ให้ SK hynix ชั่วคราว แต่กลับมานำในไตรมาส 2/2026 ด้วยการผลิต HBM4 เร็ว</dd>
+        <dt>ลูกค้า</dt><dd>ครบทุกกลุ่ม ตั้งแต่ SSD ผู้บริโภค (ซีรีส์ 990/9100 Pro) มือถือ Galaxy ไปจนถึงศูนย์ข้อมูล จุดแข็งคือกำลังผลิตและความครบวงจร (หน่วยความจำ + foundry + แพ็กเกจิง)</dd>
+        <dt>พาร์ทเนอร์</dt><dd>NVIDIA, AMD, Google, Apple, Microsoft, Tesla, ASML</dd>
+      </dl></div>
+      <div class="card"><h3>SK hynix</h3><span class="tagline">เกาหลีใต้ · ผู้นำ HBM</span><dl>
+        <dt>ประวัติ</dt><dd>เริ่มปี 1983 ในชื่อ Hyundai Electronics ควบรวมกับ LG Semicon ปี 1999 หลังวิกฤตต้มยำกุ้ง แยกออกเป็น Hynix ปี 2001 และกลุ่ม SK ซื้อปี 2012 พัฒนา HBM ร่วมกับ AMD สำเร็จเป็นรายแรกปี 2013</dd>
+        <dt>คุณค่าองค์กร</dt><dd>ปรัชญา SKMS เน้นความสุขของพนักงานและสังคม และ VWBE (ทำด้วยความสมัครใจและใช้สมองเต็มที่) วางตัวเป็น "Full Stack AI Memory Provider"</dd>
+        <dt>งานวิจัย</dt><dd>HBM3E 12 ชั้น / HBM4, เทคนิคแพ็กเกจ MR-MUF, NAND 321 ชั้น, CXL, SOCAMM, หน่วยความจำเฉพาะทาง AI</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>เกือบล้มช่วง 2001–2005 รอดด้วยการปรับโครงสร้างหนี้ หลัง SK เข้ามาปี 2012 กล้าเดิมพันกับ HBM ตอนที่ตลาดยังเล็ก จนเป็นผู้ส่ง HBM หลักให้ NVIDIA ตอนกระแส ChatGPT ปี 2023 และขึ้นนำ DRAM ครั้งแรกปี 2025 ซื้อธุรกิจ NAND ของ Intel (เป็น Solidigm) ปี 2021 ซึ่งกลายเป็นไพ่เด็ดตอน AI ต้องการ SSD จุสูง</dd>
+        <dt>ลูกค้า</dt><dd>ศูนย์ข้อมูล AI เป็นหลัก ตามด้วยมือถือและ PC ส่วนผู้บริโภคมี SSD SK hynix Platinum และ Solidigm</dd>
+        <dt>พาร์ทเนอร์</dt><dd>NVIDIA, TSMC (ทำ base die ของ HBM4), AMD, OpenAI (Stargate), SanDisk (มาตรฐาน High Bandwidth Flash)</dd>
+      </dl></div>
+      <div class="card"><h3>Micron Technology</h3><span class="tagline">สหรัฐฯ · ผู้ผลิตหน่วยความจำรายเดียวของอเมริกา</span><dl>
+        <dt>ประวัติ</dt><dd>ก่อตั้งปี 1978 ที่ Boise รัฐไอดาโฮ ได้ทุนจาก J.R. Simplot เติบโตด้วยการซื้อกิจการ เช่น DRAM ของ Texas Instruments (1998), Numonyx (2010), Elpida (2013) CEO ปัจจุบัน Sanjay Mehrotra เคยร่วมก่อตั้ง SanDisk</dd>
+        <dt>คุณค่าองค์กร</dt><dd>People, Innovation, Tenacity, Collaboration, Customer focus พันธกิจ "เปลี่ยนวิธีที่โลกใช้ข้อมูลเพื่อยกระดับชีวิตทุกคน"</dd>
+        <dt>งานวิจัย</dt><dd>DRAM 1-gamma ใช้ EUV, HBM3E/HBM4 ที่เน้นประหยัดพลังงาน, LPDDR5X สำหรับเซิร์ฟเวอร์ (SOCAMM), NAND G9, หน่วยความจำเกรดยานยนต์</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>รอดจากการตัดราคาของญี่ปุ่นช่วง 1985 (ฟ้องทุ่มตลาดและชนะ) พลิกวิกฤตปี 2012 เป็นโอกาสซื้อ Elpida เจอจีนแบนปี 2023 แต่ได้ CHIPS Act สร้างโรงงานในไอดาโฮและนิวยอร์ก ปลายปี 2025 ประกาศถอนแบรนด์ผู้บริโภค Crucial เพื่อเทกำลังผลิตให้ลูกค้า AI</dd>
+        <dt>ลูกค้า</dt><dd>Cloud/ศูนย์ข้อมูล, องค์กร, มือถือและ PC, ยานยนต์และ embedded (ผู้นำหน่วยความจำในรถยนต์)</dd>
+        <dt>พาร์ทเนอร์</dt><dd>NVIDIA, AMD, Intel, Apple, ค่ายรถยนต์, รัฐบาลสหรัฐฯ ญี่ปุ่น (โรงงานฮิโรชิมะ) และไต้หวัน</dd>
+      </dl></div>
+      <div class="card"><h3>Kioxia</h3><span class="tagline">ญี่ปุ่น · ผู้คิดค้นแฟลชเมมโมรี</span><dl>
+        <dt>ประวัติ</dt><dd>มาจาก Toshiba ซึ่ง Fujio Masuoka คิดค้นแฟลชปี 1984 และ NAND ปี 1987 แยกเป็น Toshiba Memory ปี 2017 ขายให้กลุ่มทุน Bain Capital (มี SK hynix ร่วม) ปี 2018 เปลี่ยนชื่อเป็น Kioxia ปี 2019 และเข้าตลาดหุ้นโตเกียวธันวาคม 2024</dd>
+        <dt>คุณค่าองค์กร</dt><dd>"Uplifting the world with memory" ชื่อมาจาก kioku (ความทรงจำ) กับ axia (คุณค่า)</dd>
+        <dt>งานวิจัย</dt><dd>3D NAND ตระกูล BiCS (BiCS8 ใช้ CBA ผลิตเซลล์กับวงจรควบคุมแยกแผ่นแล้วประกบ), SSD สำหรับ AI, OCTRAM, แฟลชที่เชื่อมกับ GPU โดยตรง</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>ถูกขายออกเพราะ Toshiba ขาดทุนหนักจาก Westinghouse ช่วง NAND ตกหนักปี 2023 ลดกำลังผลิตราว 30% และการควบรวมกับ WD ล้มเหลว จึงเข้าตลาดหุ้นตอนตลาดฟื้นปลายปี 2024 แทน</dd>
+        <dt>ลูกค้า</dt><dd>ชิป NAND ให้ผู้ผลิตมือถือ (เช่น Apple), SSD องค์กรและศูนย์ข้อมูล, การ์ดและแฟลชไดรฟ์</dd>
+        <dt>พาร์ทเนอร์</dt><dd>SanDisk (ร่วมทุนโรงงาน Yokkaichi และ Kitakami กว่า 20 ปี), Bain Capital, Toshiba, รัฐบาลญี่ปุ่น</dd>
+      </dl></div>
+      <div class="card"><h3>SanDisk</h3><span class="tagline">สหรัฐฯ · แบรนด์แฟลชที่คนทั่วไปรู้จัก</span><dl>
+        <dt>ประวัติ</dt><dd>ก่อตั้งปี 1988 โดย Eli Harari, Sanjay Mehrotra และ Jack Yuan บุกเบิกการ์ด CompactFlash/SD Western Digital ซื้อปี 2016 ราว 19,000 ล้านดอลลาร์ และแยกเป็นอิสระอีกครั้งกุมภาพันธ์ 2025 ส่วน WD เหลือเฉพาะฮาร์ดดิสก์</dd>
+        <dt>คุณค่าองค์กร</dt><dd>เน้นนวัตกรรมและสิทธิบัตร (สิทธิบัตรแฟลชหลายพันฉบับ) และทำให้เทคโนโลยีเก็บข้อมูลเข้าถึงทุกคน</dd>
+        <dt>งานวิจัย</dt><dd>BiCS NAND (ร่วมกับ Kioxia), SSD ความจุสูงมาก, High Bandwidth Flash (HBF) ซ้อน NAND แบบ HBM เพื่อเก็บโมเดล AI ใกล้ GPU</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>ช่วงแรกไม่มีโรงงานจึงหารายได้จากค่าสิทธิบัตร และแบ่งความเสี่ยงค่าโรงงานกับ Toshiba แยกตัวปี 2025 ก่อนราคา NAND พุ่งจาก AI พอดี</dd>
+        <dt>ลูกค้า</dt><dd>ผู้บริโภค (SD card, USB, SSD พกพา, WD_BLACK), ผู้ผลิต PC/มือถือ, ศูนย์ข้อมูล</dd>
+        <dt>พาร์ทเนอร์</dt><dd>Kioxia, SK hynix (มาตรฐาน HBF), Nintendo, ผู้ค้าปลีกทั่วโลก</dd>
+      </dl></div>
+      <div class="card"><h3>Solidigm</h3><span class="tagline">สหรัฐฯ (บริษัทลูก SK hynix) · เจ้า SSD QLC ความจุสูง</span><dl>
+        <dt>ประวัติ</dt><dd>ก่อตั้งธันวาคม 2021 จากธุรกิจ NAND และ SSD ของ Intel ที่ SK hynix ซื้อราว 9,000 ล้านดอลลาร์ สำนักงานใหญ่แคลิฟอร์เนีย โรงงานหลักอยู่ต้าเหลียน ประเทศจีน</dd>
+        <dt>คุณค่าองค์กร</dt><dd>ผสมวิศวกรรมสไตล์ Intel กับปรัชญา SK เน้นเป็นพาร์ทเนอร์ด้านการเก็บข้อมูลให้ลูกค้าองค์กร</dd>
+        <dt>งานวิจัย</dt><dd>QLC SSD ความจุ 61.44 และ 122.88 TB, SSD ระบายความร้อนด้วยของเหลว</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>ขาดทุนหนักช่วง 2022–2023 แต่เดิมพันกับ QLC จุสูงต่อเนื่อง พอศูนย์ข้อมูล AI ต้องการพื้นที่เก็บมหาศาลและประหยัดไฟในปี 2024–2026 ก็กลายเป็นสินค้าขาดตลาด</dd>
+        <dt>ลูกค้า</dt><dd>ผู้ให้บริการคลาวด์และศูนย์ข้อมูล AI</dd>
+        <dt>พาร์ทเนอร์</dt><dd>SK hynix, NVIDIA, Dell, HPE, Supermicro</dd>
+      </dl></div>
+      <div class="card"><h3>CXMT (ChangXin Memory)</h3><span class="tagline">จีน · ผู้ท้าชิง DRAM ที่โตเร็วที่สุด</span><dl>
+        <dt>ประวัติ</dt><dd>ก่อตั้งปี 2016 ที่เหอเฟย มณฑลอันฮุย ด้วยทุนรัฐบาลท้องถิ่นและกองทุนชิปแห่งชาติ ใช้สิทธิบัตรเก่าของ Qimonda เป็นจุดตั้งต้น ผลิต DDR4 ได้ปี 2019 ปัจจุบันทำ DDR5 กับ LPDDR5X</dd>
+        <dt>คุณค่าองค์กร</dt><dd>ภารกิจหลักคือการพึ่งตนเองด้านหน่วยความจำของจีนตามนโยบายรัฐ (ตีความจากที่มาของทุน)</dd>
+        <dt>งานวิจัย</dt><dd>ย่อกระบวนการผลิตโดยไม่ใช้ EUV, DDR5/LPDDR5X ความเร็วสูง, เริ่มพัฒนา HBM สำหรับชิป AI จีน</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>ถูกสหรัฐฯ จำกัดการส่งออกเครื่องมือ จึงเน้นตลาดในประเทศ ไตรมาส 2/2026 รายได้เพิ่ม 99% ส่วนแบ่งขึ้นเป็น 9.5% เพราะรายใหญ่ย้ายกำลังผลิตไปทำ HBM</dd>
+        <dt>ลูกค้า</dt><dd>ผู้ผลิตมือถือและ PC จีน (Xiaomi, Lenovo, Transsion), คลาวด์จีน</dd>
+        <dt>พาร์ทเนอร์</dt><dd>รัฐบาลท้องถิ่นเหอเฟย, Big Fund, ผู้ผลิตเครื่องมือจีน</dd>
+      </dl></div>
+      <div class="card"><h3>YMTC (Yangtze Memory)</h3><span class="tagline">จีน · ผู้ท้าชิง NAND ด้วย Xtacking</span><dl>
+        <dt>ประวัติ</dt><dd>ก่อตั้งปี 2016 ที่อู่ฮั่น โดย Tsinghua Unigroup กับกองทุนรัฐ ข้ามจาก 32 ชั้นไป 128 ชั้นและ 200+ ชั้นภายในไม่กี่ปี</dd>
+        <dt>คุณค่าองค์กร</dt><dd>นวัตกรรมของตนเองและความมั่นคงด้านห่วงโซ่อุปทานของจีน</dd>
+        <dt>งานวิจัย</dt><dd>สถาปัตยกรรม Xtacking ผลิตเซลล์กับวงจรควบคุมแยกแผ่นแล้วเชื่อม (แนวคิดที่รายใหญ่เริ่มทำตาม), เครื่องมือผลิตในประเทศ</dd>
+        <dt>ผ่านวิกฤต / จับจังหวะ</dt><dd>บริษัทแม่ผิดนัดชำระหนี้ปี 2020 และถูกใส่ Entity List ธันวาคม 2022 ทำให้ Apple ยกเลิกแผนใช้ชิป รอดด้วยเงินทุนรัฐและเครื่องมือจีน (ตัวเลขส่วนแบ่งไม่ได้ตรวจสอบ)</dd>
+        <dt>ลูกค้า</dt><dd>SSD แบรนด์จีน (เช่น ZhiTai), ผู้ผลิตมือถือและ PC จีน, แบรนด์โมดูลราคาประหยัด</dd>
+        <dt>พาร์ทเนอร์</dt><dd>Big Fund, รัฐบาลหูเป่ย, Naura และ AMEC</dd>
+      </dl></div>
+    </div>
+
+    <h2 id="m-lessons">บทเรียนร่วมและข้อสังเกต</h2>
+    <p>ตลาดหน่วยความจำเป็นวัฏจักรบูม-ตกทุก 3–4 ปี ผู้ที่ชนะคือผู้ที่มีเงินสดพอลงทุนตอนตลาดตก และเดิมพันกับเทคโนโลยีถูกตัวก่อนความต้องการมาถึง</p>
+    <ol>
+      <li><strong>ลงทุนสวนวัฏจักร:</strong> Samsung และ Micron เติบโตจากช่วงที่คู่แข่งล้ม (Qimonda, Elpida) คนที่ลดการลงทุนตอนตลาดตกมักตามไม่ทันรอบถัดไป</li>
+      <li><strong>เดิมพันก่อนตลาดมา:</strong> SK hynix ทำ HBM ตั้งแต่ปี 2013 ตอนที่ยังขายได้น้อย ส่วน Solidigm เดิมพัน QLC จุสูง ทั้งสองเก็บเกี่ยวเมื่อ AI มา</li>
+      <li><strong>เกาะลูกค้าที่กำลังโต:</strong> พาร์ทเนอร์สำคัญที่สุดตอนนี้คือ NVIDIA และ TSMC เพราะ HBM ต้องออกแบบและแพ็กเกจร่วมกับ GPU</li>
+      <li><strong>เทกำลังผลิตไปที่กำไรสูง:</strong> Micron ถอนแบรนด์ Crucial และรายใหญ่ลด DDR4 ทำให้ราคาแรม/SSD ผู้บริโภคแพงขึ้น และเปิดช่องให้ผู้เล่นจีนและไต้หวัน</li>
+      <li><strong>ภูมิรัฐศาสตร์กำหนดเกม:</strong> เงินสนับสนุนรัฐ (CHIPS Act, Big Fund, ญี่ปุ่น) และมาตรการส่งออกสหรัฐฯ มีผลพอๆ กับเทคโนโลยี</li>
+    </ol>
+    <p class="note"><b>สำหรับคนทั่วไปและนักทดลอง:</b> ซื้อแรมให้พอกับงานที่เปิดพร้อมกัน (16 GB ใช้งานทั่วไป, 32 GB ตัดต่อหรือรัน AI เล็กๆ) เลือก SSD NVMe TLC ถ้าเขียนข้อมูลบ่อย และ QLC ถ้าเน้นเก็บไฟล์ใหญ่ราคาถูก ควรดูแบรนด์ชิปที่ใช้จริงและค่า TBW (ปริมาณเขียนที่รับประกัน)</p>
+    <p class="meta">ประวัติและคุณค่าองค์กรของแต่ละบริษัทสรุปจากความรู้ทั่วไป ควรตรวจกับเว็บไซต์บริษัทก่อนนำไปอ้างอิง</p>
+
+    <nav class="pager"><a href="#home"><span>← ก่อนหน้า</span>หน้าแรก</a><a class="next" href="#design"><span>ถัดไป →</span>ออกแบบชิประดับสูงอย่างไร</a></nav>
+  </article>
+
+  <!-- ================= POST 2: DESIGN ================= -->
+  <article data-page="design" data-lang="th" class="col" hidden>
+    <span class="eyebrow">ตอนที่ 02 · การออกแบบชิป</span>
+    <h1>ออกแบบชิประดับสูงอย่างไร: เครื่องมือ ทีม และการพัฒนาทุกปี</h1>
+    <div class="meta"><span>23 ต.ค. 2026</span><a class="src" href="https://claude.ai/artifact/BALvMkobQoktDzTiC5kB57" target="_blank" rel="noopener">เอกสารต้นฉบับ ↗</a></div>
+
+    <h2 id="d-summary">สรุปสั้น</h2>
+    <p class="lede">ชิประดับ A19 Pro, M5, Threadripper หรือ GB10 ใน DGX Spark ไม่ได้ถูก "วาด" ทรานซิสเตอร์ทีละตัว แต่ถูกเขียนเป็นโค้ดฮาร์ดแวร์ (เช่น SystemVerilog) แล้วให้ซอฟต์แวร์กลุ่ม EDA (Electronic Design Automation) แปลงเป็นทรานซิสเตอร์หลายหมื่นล้านตัวโดยอัตโนมัติ ตลาด EDA ถูกครองโดย 3 บริษัท คือ Synopsys, Cadence และ Siemens EDA</p>
+    <p>ทีมพัฒนาแบ่งตามขั้นตอนของงาน คือ สถาปัตยกรรม, ออกแบบลอจิก (RTL), ตรวจสอบความถูกต้อง (verification), ออกแบบเชิงกายภาพ (physical design), วงจรแอนะล็อกและหน่วยความจำ, ซอฟต์แวร์และเฟิร์มแวร์ และทีมทดสอบชิปจริง ทีมตรวจสอบมักใหญ่กว่าทีมออกแบบ</p>
+    <p>ชิปดีขึ้นทุกปีจาก 4 แหล่งพร้อมกัน คือ (1) กระบวนการผลิตใหม่จากโรงงานอย่าง TSMC (2) สถาปัตยกรรมที่ฉลาดขึ้น (3) การบรรจุชิปแบบหลายดาย (chiplet) และ (4) การออกแบบร่วมระหว่างทีมชิปกับโรงงานและทีมซอฟต์แวร์</p>
+    <p>ข้อจำกัดถูกค้นพบด้วยข้อมูล ไม่ใช่การเดา ทีมสถาปัตยกรรมรันซอฟต์แวร์จริงบนแบบจำลองของชิปรุ่นถัดไป วัดว่าคอขวดอยู่ตรงไหน แล้วชั่งน้ำหนัก 3 ตัวแปรที่เรียกว่า <strong>PPA</strong> คือ Performance (ความเร็ว), Power (พลังงาน) และ Area (พื้นที่ ซึ่งเท่ากับต้นทุน) ข้อจำกัดหลักยุคนี้คือความร้อนและพลังงาน, memory wall และต้นทุนการผลิตที่สูงขึ้นมาก</p>
+
+    <h2 id="d-eda">โปรแกรมที่ใช้ออกแบบชิป (EDA)</h2>
+    <p>บริษัทชิปเกือบทุกรายใช้เครื่องมือจาก 3 ค่ายหลักผสมกัน แล้วเสริมด้วยเครื่องมือภายในที่เขียนเอง Apple, AMD และ NVIDIA ไม่เปิดเผยรายการทั้งหมด แต่ประกาศรับสมัครงาน งานสัมมนา และข่าวความร่วมมือชี้ว่าใช้เครื่องมือในตารางนี้เป็นหลัก</p>
+    <div class="table-wrap wide"><table>
+      <tr><th>ขั้นตอน</th><th>ทำอะไร</th><th>Synopsys</th><th>Cadence</th><th>Siemens EDA</th></tr>
+      <tr><td>จำลองการทำงาน (simulation)</td><td>รันโค้ดฮาร์ดแวร์ทีละรอบสัญญาณนาฬิกาเพื่อหาบั๊ก</td><td>VCS</td><td>Xcelium</td><td>Questa</td></tr>
+      <tr><td>ตรวจด้วยคณิตศาสตร์ (formal)</td><td>พิสูจน์ว่าวงจรไม่มีทางผิดในทุกกรณี</td><td>VC Formal</td><td>Jasper</td><td>Questa Formal</td></tr>
+      <tr><td>จำลองบนฮาร์ดแวร์ (emulation)</td><td>รันวงจรบนเครื่องพิเศษ เร็วพอจะบูตระบบปฏิบัติการได้</td><td>ZeBu, HAPS</td><td>Palladium, Protium</td><td>Veloce</td></tr>
+      <tr><td>สังเคราะห์ลอจิก (synthesis)</td><td>แปลงโค้ด RTL เป็นเกตลอจิกจากไลบรารีของโรงงาน</td><td>Design Compiler, Fusion Compiler</td><td>Genus</td><td>(ไม่ใช่จุดแข็ง)</td></tr>
+      <tr><td>จัดวางและเดินสาย (place and route)</td><td>วางเกตนับพันล้านตัวและลากสายเชื่อมบนซิลิคอน</td><td>Fusion Compiler, IC Compiler II</td><td>Innovus</td><td>Aprisa</td></tr>
+      <tr><td>วิเคราะห์เวลา (timing signoff)</td><td>ตรวจว่าสัญญาณทุกเส้นวิ่งทันในรอบนาฬิกา</td><td>PrimeTime</td><td>Tempus</td><td>(มีแต่ใช้น้อย)</td></tr>
+      <tr><td>วิเคราะห์ไฟและความร้อน</td><td>ตรวจแรงดันตก กระแส ความร้อน</td><td>PrimePower, RedHawk (จากการซื้อ Ansys)</td><td>Voltus, Celsius</td><td>(มีบางส่วน)</td></tr>
+      <tr><td>ตรวจแบบพิมพ์ (physical verification)</td><td>ตรวจว่าเลย์เอาต์ทำตามกฎของโรงงาน (DRC/LVS)</td><td>IC Validator</td><td>Pegasus</td><td>Calibre (มาตรฐานอุตสาหกรรม)</td></tr>
+      <tr><td>วงจรแอนะล็อกและ custom</td><td>วาดทรานซิสเตอร์ด้วยมือสำหรับ SRAM, PLL, SerDes</td><td>Custom Compiler</td><td>Virtuoso</td><td>(มีบางส่วน)</td></tr>
+      <tr><td>ทดสอบการผลิต (DFT)</td><td>ใส่วงจรช่วยทดสอบชิปจริงหลังผลิต</td><td>TestMAX</td><td>Modus</td><td>Tessent</td></tr>
+      <tr><td>AI ช่วยออกแบบ</td><td>ให้ AI ปรับค่าเครื่องมือหรือช่วยเขียน/ดีบักโค้ด</td><td>DSO.ai, Synopsys.ai</td><td>Cerebrus, JedAI</td><td>Solido</td></tr>
+    </table></div>
+    <p>นอกจากซอฟต์แวร์ยังต้องมีชุดข้อมูลจากโรงงานที่เรียกว่า <strong>PDK</strong> (Process Design Kit) ซึ่งบอกกฎการวาดและพฤติกรรมของทรานซิสเตอร์ในกระบวนการผลิตนั้น เช่น TSMC N3P และ <strong>IP</strong> สำเร็จรูป เช่น คอร์ Arm (NVIDIA/MediaTek ใช้ Cortex-X925 ใน GB10) ตัวควบคุมหน่วยความจำ LPDDR5X หรือ PCIe ที่ซื้อจาก Synopsys/Cadence ภาษาหลักคือ SystemVerilog ส่วนการทดสอบใช้ UVM, C++ และ Python</p>
+    <p>เครื่องมือเหล่านี้ราคาสูงมาก ใบอนุญาตหนึ่งที่นั่งของเครื่องมือระดับ signoff มีราคาหลักแสนถึงล้านดอลลาร์ต่อปี และหนึ่งโปรเจกต์ใช้เซิร์ฟเวอร์นับหมื่นคอร์รันพร้อมกัน (ตัวเลขโดยประมาณ ผู้ผลิตไม่เปิดเผยราคาจริง)</p>
+
+    <h2 id="d-flow">ขั้นตอนจากสเปกถึงชิปจริง</h2>
+    <p>ชิปเรือธงหนึ่งตัวใช้เวลาประมาณ 3 ถึง 4 ปีจากแนวคิดถึงวางขาย ในทุกขณะจะมีชิป 3 ถึง 4 รุ่นทำคู่ขนานกันอยู่ในบริษัทเดียว</p>
+    <ol>
+      <li><strong>กำหนดเป้าหมายและสถาปัตยกรรม</strong> เลือกจำนวนคอร์ ขนาดแคช แบนด์วิดท์หน่วยความจำ งบพลังงาน (มือถือไม่กี่วัตต์ เทียบกับ Threadripper หลายร้อยวัตต์) และทดลองด้วย performance model</li>
+      <li><strong>เขียน RTL</strong> อธิบายพฤติกรรมของทุกบล็อกด้วย SystemVerilog เช่น "ทุกรอบสัญญาณนาฬิกา ให้อ่านคำสั่ง 4 คำสั่งแล้วส่งต่อ"</li>
+      <li><strong>ตรวจสอบ (verification)</strong> จำลองด้วยซอฟต์แวร์ พิสูจน์ด้วย formal และรันบน emulator เพื่อบูต iOS/macOS/Linux จริงก่อนมีชิป เพราะบั๊กที่หลุดไปถึงชิปจริงมีค่าใช้จ่ายหลายสิบล้านดอลลาร์</li>
+      <li><strong>สังเคราะห์ลอจิก</strong> แปลง RTL เป็นรายการเกต (netlist) จากไลบรารี standard cell</li>
+      <li><strong>ออกแบบเชิงกายภาพ</strong> วางผังพื้น (floorplan) วางเกต เดินสายสัญญาณนาฬิกา (clock tree) และเดินสายทองแดงหลายชั้น</li>
+      <li><strong>Signoff</strong> ตรวจเวลา ไฟ ความร้อน และกฎการผลิตให้ผ่านทุกข้อ ถ้าไม่ผ่านต้องย้อนไปแก้ขั้น 4 หรือ 5 ซ้ำหลายรอบ</li>
+      <li><strong>Tape-out</strong> ส่งไฟล์เลย์เอาต์ (GDSII/OASIS) ให้โรงงานทำหน้ากาก ชิป 3nm ใช้หน้ากากหลายสิบชิ้น ผลิตเวเฟอร์รอบแรกราว 3 เดือน</li>
+      <li><strong>Post-silicon bring-up</strong> เอาชิปจริงมาบูต หาบั๊กที่เหลือ ปรับแรงดันและความถี่ และอาจแก้หน้ากากบางชั้น (respin)</li>
+    </ol>
+    <p>ขั้น 2 ถึง 6 ไม่ได้เกิดทีละขั้น แต่วนซ้ำพร้อมกันทุกสัปดาห์ ทีมเชิงกายภาพเริ่มทดลองวางผังตั้งแต่ RTL ยังเขียนไม่เสร็จ เพื่อเจอปัญหาเร็วที่สุด</p>
+
+    <h2 id="d-teams">การแบ่งทีม</h2>
+    <p>บริษัทชิปใหญ่แบ่งทีมเป็นเมทริกซ์ 2 แกน แกนแรกคือ "บล็อก" (ซีพียู จีพียู NPU หน่วยความจำ I/O) แกนที่สองคือ "สายงานวิชาชีพ" ตามตารางด้านล่าง</p>
+    <div class="table-wrap"><table>
+      <tr><th>ทีม</th><th>หน้าที่</th><th>ทักษะหลัก</th></tr>
+      <tr><td>สถาปัตยกรรม (architecture / performance modeling)</td><td>ตัดสินใจว่าชิปควรมีอะไร วัดผลก่อนสร้างจริง</td><td>สถาปัตยกรรมคอมพิวเตอร์, C++, สถิติ</td></tr>
+      <tr><td>ออกแบบลอจิก (RTL / micro-architecture)</td><td>เขียนวงจรดิจิทัลของแต่ละบล็อก</td><td>SystemVerilog, ลอจิกดิจิทัล</td></tr>
+      <tr><td>ตรวจสอบ (design verification)</td><td>หาบั๊กก่อนผลิต มักเป็นทีมใหญ่ที่สุด</td><td>UVM, formal, การเขียนโปรแกรมทดสอบ</td></tr>
+      <tr><td>ออกแบบเชิงกายภาพ (physical design)</td><td>แปลงลอจิกเป็นเลย์เอาต์ที่ผลิตได้</td><td>เครื่องมือ EDA, Tcl/Python, เวลาและไฟฟ้า</td></tr>
+      <tr><td>วงจรเฉพาะทาง (custom / analog / mixed-signal)</td><td>SRAM, ตัวสร้างสัญญาณนาฬิกา, วงจรควบคุมไฟ, SerDes</td><td>ฟิสิกส์อุปกรณ์, SPICE</td></tr>
+      <tr><td>DFT และทดสอบการผลิต</td><td>ใส่วงจรทดสอบ คัดชิปเสีย แบ่งเกรด (binning)</td><td>ทดสอบการผลิต, สถิติ yield</td></tr>
+      <tr><td>Packaging และ signal/power integrity</td><td>ออกแบบแพ็กเกจ ต่อหลายดาย ระบายความร้อน</td><td>แม่เหล็กไฟฟ้า, ความร้อน</td></tr>
+      <tr><td>ซอฟต์แวร์และเฟิร์มแวร์</td><td>ไดรเวอร์ คอมไพเลอร์ การจัดการพลังงาน</td><td>C, ระบบปฏิบัติการ</td></tr>
+      <tr><td>Post-silicon และ validation</td><td>ทดสอบชิปจริงในแล็บ</td><td>เครื่องมือวัด, ดีบั๊ก</td></tr>
+      <tr><td>CAD / เครื่องมือภายใน</td><td>ดูแลเซิร์ฟเวอร์ ใบอนุญาต สคริปต์อัตโนมัติ</td><td>ซอฟต์แวร์, DevOps</td></tr>
+    </table></div>
+    <p>ทีมชิปของ Apple, AMD และ NVIDIA มีวิศวกรหลักพันถึงหลักหมื่นคน ชิปเรือธงหนึ่งตัวอาจใช้วิศวกรหลายร้อยถึงพันกว่าคน (ประมาณการจากข้อมูลสาธารณะ) สิ่งที่ทำให้ทำงานได้คือการนำกลับมาใช้ซ้ำ (reuse) เช่น Apple ใช้คอร์ตระกูลเดียวกันทั้งใน A19 Pro และ M5 ส่วน AMD ใช้ดาย CCD แบบเดียวกันใน Ryzen, Threadripper และ EPYC</p>
+
+    <h2 id="d-abstraction">จากทรานซิสเตอร์สู่วงจรที่ทำหน้าที่ต่างกัน</h2>
+    <p>ความลับที่ทำให้คนหลักพันคนจัดการทรานซิสเตอร์หลายหมื่นล้านตัวได้คือ <strong>ลำดับชั้นนามธรรม (abstraction)</strong> แต่ละชั้นซ่อนรายละเอียดของชั้นล่าง คนออกแบบซีพียูคิดเป็นรีจิสเตอร์และสายส่งข้อมูล แล้วให้เครื่องมือแปลงลงมาเอง</p>
+    <figure>
+      <div class="chart-title">ทรานซิสเตอร์ถูกประกอบขึ้นทีละชั้น จนเป็นชิปทั้งตัว</div>
+      <div class="stack layers">
+        <div class="lvl"><span class="n">1</span><div><b>ทรานซิสเตอร์</b><span>สวิตช์ไฟฟ้าระดับนาโนเมตร (FinFET, GAA) เปิดหรือปิดตามแรงดัน</span></div></div>
+        <div class="lvl"><span class="n">2</span><div><b>เกตลอจิก (standard cell)</b><span>NAND, NOR, ฟลิปฟล็อป ทำจากทรานซิสเตอร์ไม่กี่ตัวถึงไม่กี่สิบตัว</span></div></div>
+        <div class="lvl"><span class="n">3</span><div><b>วงจรพื้นฐาน</b><span>ตัวบวก, มัลติเพล็กเซอร์, รีจิสเตอร์, เซลล์ SRAM 6 ทรานซิสเตอร์</span></div></div>
+        <div class="lvl"><span class="n">4</span><div><b>บล็อกหน้าที่</b><span>ALU, ตัวถอดรหัสคำสั่ง, แคช, ตัวคูณเมทริกซ์</span></div></div>
+        <div class="lvl"><span class="n">5</span><div><b>คอร์และเอนจิน</b><span>คอร์ CPU, คอร์ GPU, NPU, ตัวเข้ารหัสวิดีโอ</span></div></div>
+        <div class="lvl hot"><span class="n">6</span><div><b>ชิปทั้งตัว (SoC)</b><span>หลายคอร์ แคชร่วม หน่วยความจำ I/O รวมหลายหมื่นล้านทรานซิสเตอร์</span></div></div>
+      </div>
+    </figure>
+    <p>ชิปส่วนใหญ่ประกอบด้วย 3 วิธีผสมกัน</p>
+    <ul>
+      <li><strong>วงจรอัตโนมัติจาก standard cell</strong> คือส่วนใหญ่ของลอจิก โรงงานออกแบบเกตสำเร็จรูปไว้หลายพันแบบ แล้วเครื่องมือเลือกและวางให้</li>
+      <li><strong>วงจรออกแบบเอง (custom)</strong> สำหรับส่วนที่ซ้ำกันมหาศาลและต้องเน้นประสิทธิภาพสุด เช่น เซลล์ SRAM ของแคช และ register file พื้นที่ชิปเกือบครึ่งอาจเป็นหน่วยความจำบนชิป</li>
+      <li><strong>วงจรแอนะล็อก</strong> สำหรับส่วนที่คุยกับโลกภายนอก เช่น PLL ตัวควบคุมแรงดัน เซนเซอร์อุณหภูมิ และขาส่งสัญญาณความเร็วสูง</li>
+    </ul>
+    <p>การตัดสินใจว่าวงจรไหนทำหน้าที่อะไรเกิดที่ชั้นสถาปัตยกรรม งานทั่วไปที่ต้องตัดสินใจเยอะให้ CPU งานกราฟิกและคำนวณขนานให้ GPU งานคูณเมทริกซ์ของ AI ให้ NPU หรือ Tensor Core และงานเฉพาะให้หน่วยเฉพาะ (เข้ารหัสวิดีโอ ประมวลผลภาพกล้อง) ซึ่งใช้พลังงานน้อยกว่า CPU หลายเท่า ชิปยุคนี้จึงมีหน่วยเฉพาะมากขึ้นทุกปี</p>
+
+    <h2 id="d-yearly">ทำไมชิปดีขึ้นทุกปี</h2>
+    <p>ความก้าวหน้าแต่ละปีมาจากหลายคันโยกพร้อมกัน และสัดส่วนที่มาจาก "ทรานซิสเตอร์เล็กลง" ลดลงเรื่อยๆ ขณะที่สถาปัตยกรรมและ packaging สำคัญขึ้น</p>
+    <div class="table-wrap"><table>
+      <tr><th>คันโยก</th><th>ทำอย่างไร</th><th>ตัวอย่างจริง</th></tr>
+      <tr><td>กระบวนการผลิตใหม่ (process node)</td><td>ทรานซิสเตอร์เล็กลง วางได้แน่นขึ้น ใช้ไฟน้อยลง</td><td>TSMC N3E → N3P (A19 Pro, M5) ต่อไปคือ N2 ที่เปลี่ยนจาก FinFET เป็น GAA (nanosheet)</td></tr>
+      <tr><td>ไมโครสถาปัตยกรรม</td><td>ซีพียูกว้างขึ้น ทำนายการกระโดดแม่นขึ้น แคชใหญ่ขึ้น</td><td>Zen 5 ของ AMD ขยายหน่วยคำนวณเวกเตอร์เป็น 512 บิตเต็ม</td></tr>
+      <tr><td>หน่วยเฉพาะทาง</td><td>ย้ายงานที่ทำบ่อยไปไว้ในวงจรเฉพาะ</td><td>Apple ใส่ Neural Accelerator ในทุกคอร์ GPU, NVIDIA Tensor Core รุ่น 5 ใน Blackwell รองรับ FP4</td></tr>
+      <tr><td>ระบบหน่วยความจำ</td><td>แบนด์วิดท์สูงขึ้น ใช้ unified memory</td><td>GB10 ใช้ LPDDR5X 128 GB ร่วมกันทั้ง CPU และ GPU</td></tr>
+      <tr><td>Packaging และ chiplet</td><td>แบ่งชิปเป็นหลายดาย ใช้ process ต่างกัน แล้วต่อในแพ็กเกจเดียว</td><td>Threadripper มีดาย CPU หลายตัวรอบดาย I/O, GB10 ต่อดาย CPU กับ GPU ด้วย NVLink-C2C</td></tr>
+      <tr><td>ออกแบบร่วมกับโรงงาน (DTCO)</td><td>ปรับ standard cell กฎการวาด และ process ไปพร้อมกัน</td><td>Apple เป็นลูกค้ารายแรกของ node ใหม่ TSMC เกือบทุกรุ่น</td></tr>
+      <tr><td>ซอฟต์แวร์และคอมไพเลอร์</td><td>ให้ซอฟต์แวร์ใช้ฮาร์ดแวร์ใหม่ได้เต็มที่</td><td>Metal, Core ML, CUDA, ROCm</td></tr>
+      <tr><td>เครื่องมือ EDA ที่ดีขึ้นและ AI</td><td>ค้นหาการจัดวางที่ดีกว่าคนทำ ลดเวลาออกแบบ</td><td>DSO.ai และ Cerebrus ใช้ reinforcement learning</td></tr>
+    </table></div>
+    <p>คันโยกเหล่านี้ไม่ได้เปลี่ยนพร้อมกันทุกปี ปีที่ได้ process ใหม่อาจเปลี่ยนสถาปัตยกรรมน้อย ปีที่ process เดิมก็เน้นสถาปัตยกรรมแทน คล้ายจังหวะ "tick-tock" ที่ Intel เคยใช้</p>
+
+    <h2 id="d-limits">ข้อจำกัดที่เจอ และวิธีหาจุดพัฒนา</h2>
+    <p>ทุกการตัดสินใจต้องแลกกันระหว่าง PPA เช่น เพิ่มแคชทำให้เร็วขึ้นแต่ชิปใหญ่และแพงขึ้น</p>
+    <h3>วิธีหาคอขวด</h3>
+    <ol>
+      <li><strong>เก็บรอยการทำงานของซอฟต์แวร์จริง (trace)</strong> จากเกม เบราว์เซอร์ การคอมไพล์โค้ด โมเดล AI และชุดทดสอบ (SPEC CPU, Geekbench, MLPerf)</li>
+      <li><strong>รันบนแบบจำลองสถาปัตยกรรม</strong> ดูว่าเวลาหายไปตรงไหน เช่น รอหน่วยความจำ ทำนายการกระโดดผิด (top-down analysis)</li>
+      <li><strong>อ่าน performance counter จากชิปรุ่นปัจจุบัน</strong> และเทียบกับชิปคู่แข่ง</li>
+      <li><strong>ลองแก้ในแบบจำลอง</strong> เช่น เพิ่มแคช 2 เท่า แล้วดูคะแนนเทียบกับพื้นที่และพลังงานที่เพิ่ม</li>
+      <li><strong>ประเมินการออกแบบเชิงกายภาพตั้งแต่ต้น</strong> บล็อกไหนทำความถี่ไม่ถึงเป้า หรือสายแน่นเกินไป</li>
+      <li><strong>เรียนรู้จากชิปจริง</strong> วัดความร้อน กระแสรั่ว และ yield แล้วส่งผลกลับไปให้รุ่นถัดไป</li>
+    </ol>
+    <h3>ข้อจำกัดหลักในยุคนี้</h3>
+    <div class="table-wrap"><table>
+      <tr><th>ข้อจำกัด</th><th>เกิดอะไร</th><th>ทางแก้ที่ใช้อยู่</th></tr>
+      <tr><td>ความร้อนและพลังงาน (power wall)</td><td>แรงดันลดได้น้อย ความร้อนต่อพื้นที่สูงขึ้น เปิดทุกส่วนพร้อมกันไม่ได้ (dark silicon)</td><td>คอร์ผสม P/E, ปิดไฟบล็อกที่ไม่ใช้, หน่วยเฉพาะทาง, vapor chamber</td></tr>
+      <tr><td>หน่วยความจำตามไม่ทัน (memory wall)</td><td>การคำนวณเร็วขึ้นเร็วกว่าแบนด์วิดท์หน่วยความจำ โดยเฉพาะงาน AI</td><td>แคชใหญ่ขึ้น, 3D V-Cache, unified memory, HBM</td></tr>
+      <tr><td>SRAM ไม่เล็กลงตาม</td><td>ตั้งแต่ราว 5nm เซลล์ SRAM แทบไม่เล็กลง แคชจึงแพงขึ้น</td><td>ย้ายแคชไปดายแยกที่ใช้ process ถูกกว่า</td></tr>
+      <tr><td>สายทองแดงและการจ่ายไฟ</td><td>สายเล็กจนความต้านทานสูง สายสัญญาณแย่งที่กับสายไฟ</td><td>backside power เช่น TSMC A16, Intel 18A</td></tr>
+      <tr><td>ขนาดชิปสูงสุด (reticle limit)</td><td>พิมพ์ได้ครั้งละราว 800 ตร.มม.</td><td>chiplet และ packaging 2.5D/3D (CoWoS, SoIC)</td></tr>
+      <tr><td>Yield และต้นทุน</td><td>ชิปใหญ่เจอจุดบกพร่องบ่อย เวเฟอร์ 3nm แพงมาก</td><td>ดายเล็กหลายตัว, คอร์สำรอง, แบ่งเกรดขาย</td></tr>
+      <tr><td>ความซับซ้อนของการตรวจสอบ</td><td>สถานะที่เป็นไปได้เยอะเกินจะทดสอบครบ</td><td>formal, emulator, ใช้บล็อกที่พิสูจน์แล้วซ้ำ</td></tr>
+    </table></div>
+    <p>ทีมชิปไม่ได้เริ่มจากคำถาม "จะเพิ่มทรานซิสเตอร์ตรงไหน" แต่เริ่มจาก "งานที่ผู้ใช้ทำจริงติดอยู่ตรงไหน" แล้วจึงใช้งบทรานซิสเตอร์กับจุดนั้น</p>
+
+    <h2 id="d-cases">กรณีศึกษา: ชิป 4 ตัว</h2>
+    <p>ชิปทั้ง 4 ตัวแสดง 3 แนวทาง Apple ทำชิปชิ้นเดียว (monolithic) ที่เน้นประหยัดพลังงาน, AMD ต่อดายเล็กจำนวนมากเพื่อได้คอร์เยอะในต้นทุนที่คุมได้ และ NVIDIA ร่วมกับ MediaTek รวมดายจาก 2 บริษัทในแพ็กเกจเดียว</p>
+    <div class="table-wrap wide"><table>
+      <tr><th>ชิป</th><th>ออกแบบ / ผลิต</th><th>โครงสร้าง</th><th>ส่วนประกอบหลัก</th><th>จุดที่พัฒนา</th></tr>
+      <tr><td>Apple A19 Pro (iPhone 17 Pro, 2025)</td><td>Apple / TSMC N3P</td><td>ดายเดียว</td><td>CPU 6 คอร์ (2+4), GPU 6 คอร์, Neural Engine 16 คอร์</td><td>Neural Accelerator ในทุกคอร์ GPU, แคชเพิ่ม, vapor chamber</td></tr>
+      <tr><td>Apple M5 (MacBook Pro, iPad Pro, 2025)</td><td>Apple / TSMC N3P</td><td>ดายเดียว + unified memory</td><td>CPU สูงสุด 10 คอร์, GPU 10 คอร์, Neural Engine 16 คอร์, ~153 GB/s</td><td>คอร์ตระกูลเดียวกับ A19 แต่ขยายจำนวนและงบพลังงาน</td></tr>
+      <tr><td>AMD Threadripper 9000 / PRO 9000 WX (2025)</td><td>AMD / TSMC N4P + N6</td><td>chiplet: CCD 8 คอร์หลายตัวรอบดาย I/O</td><td>สูงสุด 96 คอร์ Zen 5, DDR5 8 ช่อง, PCIe 5.0</td><td>Zen 5 กว้างขึ้น ใช้ CCD เดียวกับ Ryzen/EPYC</td></tr>
+      <tr><td>NVIDIA GB10 Grace Blackwell (DGX Spark, 2025)</td><td>NVIDIA + MediaTek / TSMC 3nm</td><td>2 ดาย เชื่อมด้วย NVLink-C2C</td><td>CPU Arm 20 คอร์ (10 X925 + 10 A725), GPU Blackwell, LPDDR5X 128 GB</td><td>ย่อซูเปอร์ชิปศูนย์ข้อมูลลงเครื่องตั้งโต๊ะ ~1 petaFLOP ที่ FP4</td></tr>
+    </table></div>
+    <p>การที่ GB10 ใช้ดาย CPU จาก MediaTek และดาย GPU จาก NVIDIA เป็นตัวอย่างของการแบ่งทีมข้ามบริษัท ทั้งสองต้องตกลงอินเทอร์เฟซระหว่างดายให้ชัดตั้งแต่ต้น แล้วต่างคนต่างพัฒนาคู่ขนาน</p>
+
+    <h2 id="d-diy">ถ้าอยากลองทำเอง</h2>
+    <p>เครื่องมือเชิงพาณิชย์แพงเกินจะใช้เอง แต่มีเครื่องมือโอเพนซอร์สที่ทำตามขั้นตอนเดียวกันได้ครบ ตั้งแต่เขียน RTL จนส่งผลิตชิปจริง</p>
+    <div class="table-wrap"><table>
+      <tr><th>ขั้น</th><th>เครื่องมือฟรี</th><th>เทียบกับมืออาชีพ</th></tr>
+      <tr><td>เขียนและจำลองวงจร</td><td>Icarus Verilog, Verilator, GTKWave, cocotb</td><td>VCS, Xcelium, Questa</td></tr>
+      <tr><td>ทดลองบนฮาร์ดแวร์จริง</td><td>บอร์ด FPGA ราคาไม่กี่พันบาท + Yosys/nextpnr</td><td>Palladium, HAPS</td></tr>
+      <tr><td>สังเคราะห์และจัดวาง</td><td>Yosys + OpenROAD ผ่าน OpenLane / LibreLane</td><td>Fusion Compiler, Genus + Innovus</td></tr>
+      <tr><td>ตรวจเลย์เอาต์</td><td>Magic, KLayout, Netgen</td><td>Calibre, IC Validator</td></tr>
+      <tr><td>PDK เปิด</td><td>SkyWater SKY130, GF180MCU, IHP SG13G2</td><td>TSMC N3P (เฉพาะลูกค้าที่เซ็น NDA)</td></tr>
+      <tr><td>ส่งผลิตชิปจริง</td><td>Tiny Tapeout แบ่งพื้นที่ชิปร่วมกัน ค่าใช้จ่ายหลักร้อยดอลลาร์</td><td>tape-out เต็มชิป 3nm หลายสิบล้านดอลลาร์</td></tr>
+    </table></div>
+    <h3>เส้นทางที่แนะนำ</h3>
+    <ol>
+      <li>เรียนลอจิกดิจิทัลและสร้างคอมพิวเตอร์จากเกต NAND ด้วย Nand2Tetris (ฟรี)</li>
+      <li>เขียน Verilog/SystemVerilog และทดสอบด้วย Verilator + cocotb</li>
+      <li>สร้างซีพียู RISC-V ตัวเล็กแล้วรันบนบอร์ด FPGA</li>
+      <li>ส่งดีไซน์เล็กๆ เข้า Tiny Tapeout เพื่อได้ชิปจริงที่ออกแบบเอง</li>
+    </ol>
+    <p class="note"><b>หมายเหตุ:</b> เรียบเรียงจากประกาศสาธารณะของ Apple, AMD, NVIDIA, MediaTek, TSMC และผู้ผลิต EDA ถึงราวกลางปี 2026 โดยไม่ได้เปิดตรวจซ้ำทุกตัวเลข สเปกชิปเป็นค่าโดยประมาณ ขนาดทีมและราคาใบอนุญาตเป็นการประมาณจากข้อมูลสาธารณะ</p>
+
+    <nav class="pager"><a href="#memory"><span>← ก่อนหน้า</span>RAM และ SSD</a><a class="next" href="#market"><span>ถัดไป →</span>ประเภทชิปและอุปสงค์-อุปทาน</a></nav>
+  </article>
+
+  <!-- ================= POST 3: MARKET ================= -->
+  <article data-page="market" data-lang="th" class="col" hidden>
+    <span class="eyebrow">ตอนที่ 03 · ภาพรวมอุตสาหกรรม</span>
+    <h1>ชิปตามฟังก์ชัน การสร้าง และอุปสงค์-อุปทาน</h1>
+    <div class="meta"><span>4 พ.ย. 2026</span><a class="src" href="https://claude.ai/artifact/BC9RnuwBxh6GctMUpo5Mpc" target="_blank" rel="noopener">เอกสารต้นฉบับ ↗</a></div>
+
+    <h2 id="k-overview">ภาพรวม</h2>
+    <p class="lede">ชิปแบ่งได้ราว 10 กว่าหมวดตามปัญหาที่แก้ (คำนวณ จำ แปลงสัญญาณ จ่ายไฟ สื่อสาร รับรู้ ฯลฯ) ทุกหมวดสร้างจากฐานเดียวกันคือทรานซิสเตอร์บนเวเฟอร์ ในปี 2026 คอขวดอุปทานที่หนักที่สุดอยู่ที่ HBM, advanced packaging (CoWoS) และโหนด 3nm/2nm ซึ่งถูกดึงโดยดีมานด์ AI ขณะที่ชิปโหนดเก่า (MCU, power, analog) อุปทานล้นกลับมาสมดุลแล้ว</p>
+    <p class="note"><b>หมายเหตุเรื่องตัวเลข:</b> ตัวเลขตลาดและกำลังผลิตในตอนนี้เป็นค่าประมาณจากรายงานสาธารณะถึงกลางปี 2026 (TrendForce, WSTS, Yole, งบการเงิน TSMC/SK hynix/NVIDIA) ยังไม่ได้ยืนยันจากหน้าต้นฉบับ ใช้ดูทิศทางและขนาด ไม่ควรใช้อ้างอิงทางการเงิน</p>
+
+    <h2 id="k-types">หมวดหมู่ชิปตามฟังก์ชันและปัญหาที่แก้</h2>
+    <p>ชิปทุกตัวตอบคำถามเดียวก่อนออกแบบ คือ "จะย้าย เก็บ แปลง หรือควบคุมอะไร" คำตอบนั้นกำหนดวัสดุ โหนด และสถาปัตยกรรม สัดส่วนตลาดเป็นค่าประมาณของตลาดชิปโลกปี 2026 (ราว 7 แสนล้านดอลลาร์)</p>
+    <div class="table-wrap wide"><table>
+      <tr><th>หมวด</th><th>ปัญหาที่แก้</th><th>ตัวอย่าง</th><th>โหนด / วัสดุ</th><th class="num">สัดส่วนตลาด</th></tr>
+      <tr><td>คำนวณทั่วไป (CPU)</td><td>ทำงานหลากหลาย ตัดสินใจเร็ว</td><td>x86, Arm, RISC-V</td><td>2–5nm</td><td class="num">~10%</td></tr>
+      <tr><td>คำนวณขนาน (GPU / AI accelerator / NPU)</td><td>คูณเมทริกซ์ปริมาณมหาศาลสำหรับ AI กราฟิก</td><td>NVIDIA Blackwell/Rubin, AMD MI, Google TPU</td><td>3–4nm + HBM + CoWoS</td><td class="num">~30% โตเร็วสุด</td></tr>
+      <tr><td>หน่วยความจำ (DRAM / HBM / NAND)</td><td>เก็บข้อมูลใกล้ตัวคำนวณและถาวร</td><td>DDR5, LPDDR5X, HBM3E/HBM4, 3D NAND</td><td>1b/1c nm DRAM, NAND 200–300+ ชั้น</td><td class="num">~25–30%</td></tr>
+      <tr><td>SoC มือถือ/อุปกรณ์</td><td>รวม CPU GPU NPU โมเด็มในชิปเดียว ประหยัดไฟ</td><td>Apple A/M, Snapdragon, Dimensity</td><td>3nm</td><td class="num">~8%</td></tr>
+      <tr><td>MCU / ชิปฝังตัว</td><td>ควบคุมเครื่องใช้ รถ เซนเซอร์ ราคาถูก กินไฟน้อย</td><td>STM32, ESP32, RP2040/RP2350</td><td>28–90nm</td><td class="num">~4%</td></tr>
+      <tr><td>Analog / Mixed-signal</td><td>แปลงโลกจริงเป็นดิจิทัล ขยายสัญญาณ</td><td>ADC/DAC, op-amp, PMIC</td><td>65–180nm, BCD</td><td class="num">~12%</td></tr>
+      <tr><td>Power semiconductor</td><td>สวิตช์และแปลงพลังงานไฟฟ้าแรงดันสูง</td><td>MOSFET, IGBT, SiC, GaN</td><td>SiC 8 นิ้ว, GaN-on-Si</td><td class="num">~5%</td></tr>
+      <tr><td>RF / สื่อสารไร้สาย</td><td>ส่งรับคลื่นวิทยุ 5G Wi-Fi ดาวเทียม</td><td>PA, LNA, ฟิลเตอร์, transceiver</td><td>GaAs, GaN, RF-SOI</td><td class="num">~3%</td></tr>
+      <tr><td>เซนเซอร์ / MEMS / Opto</td><td>รับรู้แสง แรง การเคลื่อนไหว ส่งแสง</td><td>CMOS image sensor, IMU, LiDAR, LED, เลเซอร์</td><td>28–65nm, InP, GaN</td><td class="num">~5%</td></tr>
+      <tr><td>ปรับแต่งได้ / เฉพาะงาน</td><td>FPGA เปลี่ยนวงจรหลังผลิตได้, ASIC เร็วที่สุดสำหรับงานเดียว</td><td>AMD/Xilinx, Lattice, ชิปขุดบิตคอยน์</td><td>หลากหลาย</td><td class="num">~2%</td></tr>
+      <tr><td>ความปลอดภัย / การเชื่อมต่อ</td><td>เก็บกุญแจ ยืนยันตัวตน ส่งข้อมูลความเร็วสูง</td><td>Secure element, TPM, SerDes, switch</td><td>5–40nm</td><td class="num">รวมในหมวดอื่น</td></tr>
+      <tr><td>เชิงทดลอง</td><td>ปัญหาที่คอมพิวเตอร์ปกติทำได้ช้ามาก หรือเลียนแบบสมอง</td><td>Quantum, neuromorphic, photonic</td><td>superconducting, ซิลิกอนโฟโตนิกส์</td><td class="num">&lt;1%</td></tr>
+    </table></div>
+    <p>สำหรับการทดลองที่บ้าน หมวดที่จับต้องง่ายที่สุดคือ MCU, เซนเซอร์ และ FPGA ส่วนการออกแบบ ASIC เองทำได้ผ่าน Tiny Tapeout บน PDK เปิด (SKY130, GF180)</p>
+
+    <h2 id="k-layers">กระบวนการสร้างจากฐานถึงสถาปัตยกรรม</h2>
+    <p>ชิปทุกหมวดสร้างจากทรานซิสเตอร์บนเวเฟอร์ ความต่างอยู่ที่ชั้นบน ชิป AI เน้นชั้น 4–5 และ 7 (บล็อกคูณเมทริกซ์ + HBM + CoWoS) ส่วนชิป power เน้นชั้น 1–2 (วัสดุ SiC/GaN ทนแรงดัน)</p>
+    <figure>
+      <div class="chart-title">ชิปหนึ่งตัวซ้อนกัน 8 ชั้น จากทรายถึงซอฟต์แวร์</div>
+      <div class="stack layers">
+        <div class="lvl"><span class="n">1</span><div><b>วัสดุและเวเฟอร์</b><span>ทรายควอตซ์ → ซิลิคอนบริสุทธิ์ 9 ตัวเก้า → แท่งผลึก Czochralski → เวเฟอร์ 300 มม. (หรือ SiC, GaN, GaAs สำหรับงานไฟฟ้าและ RF)</span></div></div>
+        <div class="lvl hot"><span class="n">2</span><div><b>ทรานซิสเตอร์ สวิตช์เปิดปิดด้วยไฟฟ้า</b><span>Planar → FinFET (22–3nm) → GAA / nanosheet (2nm, ปี 2025–26) → CFET ซ้อนบนล่าง (เป้าหลัง 2030)</span></div></div>
+        <div class="lvl"><span class="n">3</span><div><b>เกตและเซลล์มาตรฐาน</b><span>CMOS 4–6 ตัวรวมเป็น NAND, NOR, flip-flop, เซลล์ SRAM รวบเป็น standard cell library ของแต่ละโหนด</span></div></div>
+        <div class="lvl"><span class="n">4</span><div><b>บล็อกวงจร (IP)</b><span>ALU, ตัวคูณเมทริกซ์, แคช, ตัวควบคุมหน่วยความจำ, PHY, SerDes, ADC ซื้อหรือออกแบบเอง</span></div></div>
+        <div class="lvl"><span class="n">5</span><div><b>สถาปัตยกรรม</b><span>ISA (x86, Arm, RISC-V) + ไมโครสถาปัตยกรรม: ไปป์ไลน์ จำนวนคอร์ ลำดับชั้นหน่วยความจำ NoC</span></div></div>
+        <div class="lvl"><span class="n">6</span><div><b>ผลิตในโรงงาน (front-end)</b><span>ลิโธกราฟี (EUV) กัด เคลือบ ฝังไอออน ขัด CMP วนซ้ำ 60–100 ชั้นหน้ากาก กว่า 1,000 ขั้นตอน ราว 3–4 เดือน</span></div></div>
+        <div class="lvl"><span class="n">7</span><div><b>แพ็กเกจและทดสอบ (back-end)</b><span>wire-bond, flip-chip → 2.5D (CoWoS) → 3D hybrid bonding และ chiplet ต่อกันด้วยมาตรฐาน UCIe</span></div></div>
+        <div class="lvl"><span class="n">8</span><div><b>ระบบและซอฟต์แวร์</b><span>แผงวงจร ระบายความร้อน ไฟเลี้ยง เฟิร์มแวร์ คอมไพเลอร์ และไลบรารี (เช่น CUDA) ที่ทำให้ชิปถูกใช้งานจริง</span></div></div>
+      </div>
+      <figcaption>ผลิตจากชั้นล่างขึ้นบน ส่วนการออกแบบคิดจากสเปกลงมา</figcaption>
+    </figure>
+    <p>ลำดับการออกแบบจริงเดินสวนกับลำดับการผลิต</p>
+    <ol>
+      <li><strong>สเปก</strong> กำหนดปัญหา งบไฟ (W) ราคา และปริมาณผลิต</li>
+      <li><strong>สถาปัตยกรรม</strong> เลือก ISA จำนวนคอร์ หน่วยความจำ และจำลองด้วยโมเดลประสิทธิภาพ</li>
+      <li><strong>RTL</strong> เขียนวงจรด้วย Verilog/SystemVerilog/VHDL แล้วตรวจสอบ (verification กินแรงงานราว 50–60% ของโครงการ)</li>
+      <li><strong>Synthesis + Place &amp; Route</strong> แปลงเป็นเกตจากไลบรารีของโรงงาน วางและเดินสาย ได้ไฟล์ GDSII</li>
+      <li><strong>Tape-out</strong> ส่งโรงงานทำหน้ากากและผลิตเวเฟอร์ แล้วตัด แพ็ก ทดสอบ</li>
+      <li><strong>Bring-up</strong> เปิดชิปตัวแรก เขียนเฟิร์มแวร์ ไดรเวอร์ และแก้บั๊ก</li>
+    </ol>
+    <p>รายละเอียดเครื่องมือ ทีม และต้นทุนแต่ละขั้นอยู่ใน<a href="#design">ตอนที่ 02</a></p>
+
+    <h2 id="k-supply">อุปสงค์-อุปทานแต่ละด้าน</h2>
+    <p>ปี 2026 ทุกชิ้นในห่วงโซ่ AI ยังขาด (อุปทานราว 86–91% ของความต้องการ) คอขวดหลักคือ HBM และ CoWoS ส่วนโหนดเก่าล้นตลาดราว 8–14% จากกำลังผลิตใหม่ในจีน กราฟใช้อัตราอุปทานต่ออุปสงค์ (sufficiency ratio) เพื่อเทียบทุกด้านบนสเกลเดียวกัน เพราะแต่ละด้านนับหน่วยต่างกัน (เวเฟอร์ บิต ชิ้น)</p>
+    <figure>
+      <div class="chart-title">อุปทาน HBM และ CoWoS ยังต่ำกว่าความต้องการถึงปี 2027 ขณะที่โหนดเก่าล้นตลาด</div>
+      <div class="chart-wrap"><svg data-chart="supply" role="img" aria-label="กราฟอัตราอุปทานต่ออุปสงค์ 6 ด้าน ปี 2023 ถึง 2028"></svg></div>
+      <figcaption>อัตราอุปทานต่ออุปสงค์ (%) ต่ำกว่า 100 = ขาดตลาด สูงกว่า 100 = ล้นตลาด · เส้นประ = CoWoS · แถบพื้นหลัง = ประมาณการ · ค่าที่ผู้เขียนสังเคราะห์จากทิศทางในรายงาน TrendForce, Yole, WSTS และงบ TSMC/SK hynix/NVIDIA ถึงกลางปี 2026 ไม่ใช่ตัวเลขทางการ</figcaption>
+    </figure>
+    <div class="table-wrap wide"><table>
+      <tr><th>ด้าน</th><th>อุปสงค์มาจาก</th><th>คอขวดอุปทาน</th><th>ขนาดตลาด 2026</th><th>ผู้ผลิตหลัก</th></tr>
+      <tr><td>ชิปเร่ง AI</td><td>ศูนย์ข้อมูล hyperscaler และ sovereign AI</td><td>ถูกจำกัดด้วย HBM, CoWoS, ไฟฟ้าศูนย์ข้อมูล</td><td class="num">~$250–350B</td><td>NVIDIA, AMD, Broadcom/Google, Marvell</td></tr>
+      <tr><td>HBM</td><td>ชิป AI หนึ่งตัวใช้ HBM 8–12 กอง</td><td>ผลิตช้า (die ใหญ่ 3 เท่า DRAM ต่อบิต, yield TSV)</td><td class="num">~$50–60B</td><td>SK hynix, Samsung, Micron</td></tr>
+      <tr><td>โหนด 3nm/2nm</td><td>ชิป AI, SoC มือถือ, CPU ศูนย์ข้อมูล</td><td>เครื่อง EUV (ASML เจ้าเดียว), ลงทุน $20B+ ต่อโรงงาน</td><td class="num">~$80–100B</td><td>TSMC เกิน 90%, Samsung, Intel 18A</td></tr>
+      <tr><td>CoWoS / แพ็กเกจขั้นสูง</td><td>GPU + HBM ต้องวางบน interposer เดียวกัน</td><td>กำลังผลิตราว 90–110 พันเวเฟอร์/เดือน ปลายปี 2026</td><td class="num">~$50–60B</td><td>TSMC, ASE/SPIL, Amkor, Intel Foveros</td></tr>
+      <tr><td>DRAM/NAND ทั่วไป</td><td>PC, มือถือ, SSD เซิร์ฟเวอร์ AI</td><td>กำลังผลิตถูกย้ายไปทำ HBM ราคาขึ้นแรง</td><td class="num">~$200B+</td><td>Samsung, SK hynix, Micron, Kioxia, YMTC, CXMT</td></tr>
+      <tr><td>โหนดเก่า / MCU / power</td><td>รถยนต์ EV, อุตสาหกรรม, เครื่องใช้</td><td>ไม่ขาด จีนเพิ่มกำลังผลิต 28nm+ จนกดราคา</td><td class="num">~$120B+</td><td>TI, Infineon, ST, NXP, SMIC, Hua Hong</td></tr>
+    </table></div>
+    <p>บทเรียนจากกราฟคือคอขวดย้ายที่ ปี 2023 ขาด CoWoS มากที่สุด ปี 2026 ขาด HBM และลามไป DRAM ทั่วไป หลังปี 2027 คอขวดที่น่าจะตามมาคือไฟฟ้าและความร้อนของศูนย์ข้อมูล ไม่ใช่ตัวชิป</p>
+
+    <h2 id="k-frontier">สิ่งที่ยังไม่ค้นพบหรือยังไม่คุ้ม แต่สำคัญ</h2>
+    <p>เป้าใหญ่ของอุตสาหกรรมมีสองข้อ ระยะสั้น (ถึงราว 2030) คือทำให้ชิป AI ได้ประสิทธิภาพต่อวัตต์เพิ่มราว 10 เท่า ระยะยาว (2035 ขึ้นไป) คือการคำนวณที่ไม่ติดกำแพงไฟฟ้าและความร้อน เทคโนโลยีส่วนใหญ่ผ่านครึ่งทางเป้าระยะสั้นแล้ว แต่เป้าระยะยาวยังต่ำกว่า 20% เกือบทั้งหมด</p>
+    <figure>
+      <div class="chart-title">มีเพียง backside power ที่ผ่านครึ่งทางเป้าระยะยาว ที่เหลือไม่เกิน 20%</div>
+      <div class="chart-wrap"><svg data-chart="frontier" role="img" aria-label="ความคืบหน้า 12 เทคโนโลยีเทียบเป้าระยะสั้นและระยะยาว"></svg></div>
+      <figcaption>ความคืบหน้าเทียบเป้า (%) ประเมินโดยผู้เขียนจากโรดแมปสาธารณะ (imec, TSMC, Intel, IBM, ASML) ณ พ.ย. 2026 ไม่ใช่ตัวชี้วัดทางการ</figcaption>
+    </figure>
+    <p><span class="tag no-find">ยังไม่ค้นพบ</span> ฟิสิกส์หรือวิธีผลิตยังไม่พร้อม &nbsp; <span class="tag no-pay">ยังไม่คุ้ม</span> ทำได้แต่ต้นทุนหรือ yield ยังไม่ผ่าน &nbsp; <span class="tag ok">เริ่มคุ้มแล้ว</span></p>
+    <div class="table-wrap wide"><table>
+      <tr><th>เทคโนโลยี</th><th>สถานะ</th><th>ทำไมสำคัญ</th><th>อุปสรรคหลัก</th><th>เป้าระยะสั้น</th><th>เป้าระยะยาว</th></tr>
+      <tr><td>Quantum แก้ error ได้จริง</td><td><span class="tag no-find">ยังไม่ค้นพบ</span></td><td>จำลองโมเลกุล ยา วัสดุ</td><td>qubit สูญสถานะเร็ว ต้องใช้ qubit กายภาพนับพันต่อ 1 logical qubit</td><td>~100 logical qubits</td><td>ล้าน qubit ทำงานที่มีประโยชน์</td></tr>
+      <tr><td>Neuromorphic / analog in-memory</td><td><span class="tag no-find">ยังไม่ค้นพบ</span></td><td>ประหยัดพลังงาน AI หลายสิบเท่า</td><td>ความแม่นยำต่ำ ไม่มีซอฟต์แวร์รองรับ</td><td>ชิป edge เชิงพาณิชย์</td><td>AI ใช้ไฟระดับสมอง (~20 W)</td></tr>
+      <tr><td>วัสดุ 2D แทน channel ซิลิคอน</td><td><span class="tag no-find">ยังไม่ค้นพบ</span></td><td>ย่อทรานซิสเตอร์ต่อหลังซิลิคอนถึงขีดจำกัด</td><td>ปลูกผลึกไม่มีตำหนิบนเวเฟอร์ 300 มม.</td><td>ทดสอบบนสายผลิตนำร่อง</td><td>ใช้ในโหนดหลัง 2035</td></tr>
+      <tr><td>CFET ทรานซิสเตอร์ซ้อน</td><td><span class="tag no-pay">ยังไม่คุ้ม</span></td><td>เพิ่มความหนาแน่นหลัง GAA ราว 1.5–2 เท่า</td><td>ขั้นตอนผลิตซับซ้อนมาก</td><td>สาธิตวงจรบนเวเฟอร์เต็ม</td><td>ผลิตจริงราว 2032–34</td></tr>
+      <tr><td>High-NA EUV</td><td><span class="tag no-pay">ยังไม่คุ้ม</span></td><td>พิมพ์ลายเล็กลงในครั้งเดียว</td><td>เครื่องละราว $350–400M</td><td>ใช้ในโหนด ~1.4nm (2027–28)</td><td>Hyper-NA หลัง 2030</td></tr>
+      <tr><td>Backside power delivery</td><td><span class="tag ok">เริ่มคุ้มแล้ว</span></td><td>แยกสายไฟไปด้านหลัง ลดไฟตก</td><td>ความร้อนและการดีบั๊กยากขึ้น</td><td>Intel 18A, TSMC A16 ผลิตจริง</td><td>มาตรฐานทุกโหนดขั้นสูง</td></tr>
+      <tr><td>HBM4 / หน่วยความจำใกล้ตัวคำนวณ</td><td><span class="tag no-pay">ยังไม่คุ้ม (PIM)</span></td><td>แก้ memory wall</td><td>yield การซ้อน 16 ชั้น ราคาต่อบิตสูง</td><td>HBM4 ผลิตจำนวนมาก 2026</td><td>คำนวณในหน่วยความจำทั่วไป</td></tr>
+      <tr><td>Hybrid bonding 3D</td><td><span class="tag no-pay">ยังไม่คุ้ม</span></td><td>ซ้อนชิปแนบสนิท สายสั้น กินไฟน้อย</td><td>ความสะอาดผิวระดับนาโน ความร้อนสะสม</td><td>HBM และ SoIC ใช้ hybrid bonding</td><td>logic ซ้อน logic ทั่วไป</td></tr>
+      <tr><td>Co-packaged optics / photonics</td><td><span class="tag no-pay">ยังไม่คุ้ม</span></td><td>ส่งข้อมูลด้วยแสง ลดไฟต่อบิตหลายเท่า</td><td>ต้นทุนเลเซอร์ ซ่อมบำรุงยาก</td><td>สวิตช์ CPO ในศูนย์ข้อมูล</td><td>optical I/O ระหว่างชิปทั่วไป</td></tr>
+      <tr><td>ตลาด chiplet ข้ามค่าย (UCIe)</td><td><span class="tag no-pay">ยังไม่คุ้ม</span></td><td>บริษัทเล็กสร้างชิปใหญ่ได้โดยประกอบชิ้นส่วน</td><td>ใครรับผิดชอบเมื่อเสีย, known-good-die</td><td>chiplet ต่างค่ายในสินค้าจริง</td><td>ซื้อ chiplet เหมือนซื้อ IP</td></tr>
+      <tr><td>Glass substrate</td><td><span class="tag no-pay">ยังไม่คุ้ม</span></td><td>แพ็กเกจใหญ่ขึ้นโดยไม่บิดงอ</td><td>แก้วแตกง่าย เจาะรู TGV</td><td>ผลิตนำร่องในชิป AI</td><td>แทนวัสดุอินทรีย์ในแพ็กเกจใหญ่</td></tr>
+      <tr><td>ชิป open-source / PDK เปิด</td><td><span class="tag no-pay">ยังไม่คุ้ม (เชิงพาณิชย์)</span></td><td>คนทั่วไป นักศึกษา และประเทศเล็กออกแบบชิปได้</td><td>PDK เปิดมีแค่โหนด 130–180nm</td><td>tapeout คนละไม่กี่ร้อยดอลลาร์</td><td>PDK เปิดระดับ 28nm ลงมา</td></tr>
+    </table></div>
+    <p>สำหรับคนที่อยากลงมือทำ แถว "ชิป open-source" เป็นทางเดียวที่คนทั่วไปมีส่วนได้ตอนนี้ เช่น ออกแบบวงจรดิจิทัลเล็กด้วย Verilog แล้วส่งผลิตผ่าน Tiny Tapeout หรือเริ่มจาก FPGA ราคาไม่กี่ร้อยบาท</p>
+
+    <h2 id="k-sources">แหล่งข้อมูลสำหรับตรวจสอบ</h2>
+    <ul>
+      <li>ขนาดตลาดชิปรวมและตามหมวด: <a href="https://www.wsts.org/" target="_blank" rel="noopener">WSTS</a> และ <a href="https://www.semiconductors.org/" target="_blank" rel="noopener">SIA</a></li>
+      <li>อุปสงค์-อุปทาน HBM, DRAM, NAND, CoWoS: <a href="https://www.trendforce.com/" target="_blank" rel="noopener">TrendForce</a></li>
+      <li>ตลาด advanced packaging และ power (SiC/GaN): <a href="https://www.yolegroup.com/" target="_blank" rel="noopener">Yole Group</a></li>
+      <li>กำลังผลิตโหนดขั้นสูงและ CoWoS: <a href="https://investor.tsmc.com/" target="_blank" rel="noopener">TSMC Investor Relations</a></li>
+      <li>รายได้ชิป AI และ HBM: <a href="https://investor.nvidia.com/" target="_blank" rel="noopener">NVIDIA</a> และ <a href="https://www.skhynix.com/ir/" target="_blank" rel="noopener">SK hynix</a></li>
+      <li>โรดแมปทรานซิสเตอร์: <a href="https://www.imec-int.com/" target="_blank" rel="noopener">imec</a> และ <a href="https://irds.ieee.org/" target="_blank" rel="noopener">IRDS</a></li>
+      <li>ชิป open-source: <a href="https://tinytapeout.com/" target="_blank" rel="noopener">Tiny Tapeout</a></li>
+    </ul>
+
+    <nav class="pager"><a href="#design"><span>← ก่อนหน้า</span>ออกแบบชิประดับสูงอย่างไร</a><a class="next" href="#home"><span>กลับ →</span>หน้าแรก</a></nav>
+  </article>
+  <!-- ================= EN: HOME ================= -->
+  <article data-page="home" data-lang="en" class="col" hidden>
+    <span class="eyebrow">Collected reports · 3 parts</span>
+    <h1>From sand to silicon: learning semiconductors one topic at a time</h1>
+    <p class="lede">This page collects every report written in the Semiconductors Tinkering project into one blog. Pick a part from the menu on the left (or the bar at the top on a phone) to switch pages.</p>
+
+    <div class="posts">
+      <a class="post-link" href="#memory">
+        <span class="big">01</span>
+        <div><h3>RAM and SSD: technology, types and the key memory players</h3>
+        <p>How RAM and SSD differ, how both differ from cache, the main types, DRAM/NAND market share for Q2 2026, and profiles of seven memory companies.</p>
+        <span class="d">16 Oct 2026</span></div>
+      </a>
+      <a class="post-link" href="#design">
+        <span class="big">02</span>
+        <div><h3>How advanced chips are designed: tools, teams and yearly gains</h3>
+        <p>The EDA tools, the flow from spec to tape-out, how teams are split, why chips improve every year, PPA limits, and case studies of A19 Pro, M5, Threadripper and GB10.</p>
+        <span class="d">23 Oct 2026</span></div>
+      </a>
+      <a class="post-link" href="#market">
+        <span class="big">03</span>
+        <div><h3>Chips by function, how they are built, and supply vs demand</h3>
+        <p>Twelve chip categories by the problem they solve, the 8-layer stack from sand to software, supply-to-demand ratios for 2023–2028, and technologies still out of reach.</p>
+        <span class="d">4 Nov 2026</span></div>
+      </a>
+    </div>
+
+    <h2 id="en-home-path">Suggested reading order for beginners</h2>
+    <p>The parts were written in the order the questions came in. If you are starting from zero, this order flows better.</p>
+    <div class="path">
+      <div><b>Start with part 03</b>See the big picture: what kinds of chips exist, how many layers go into one, and what the market is short of.</div>
+      <div><b>Then part 02</b>Go deeper into how a single chip is designed, and which tools and teams it takes.</div>
+      <div><b>Finish with part 01</b>Zoom in on memory, the most important bottleneck of the AI era.</div>
+    </div>
+
+    <h2 id="en-home-common">What all three parts agree on</h2>
+    <ul>
+      <li><strong>AI is the main pull on the industry.</strong> AI accelerators, HBM, CoWoS and high-capacity enterprise SSDs are all still short of demand in 2026.</li>
+      <li><strong>The bottleneck has moved from compute to memory and packaging</strong> (the memory wall). After 2027 it is likely to move again, to data-center power and cooling.</li>
+      <li><strong>Chips get better through many levers at once,</strong> not only smaller transistors: architecture, chiplets and packaging matter more each year.</li>
+      <li><strong>Ordinary people can really take part,</strong> through MCUs, FPGAs and open-source tools, all the way to a real chip with Tiny Tapeout.</li>
+    </ul>
+
+    <p class="note"><b>About the numbers:</b> most figures are estimates from public reports up to mid-2026. The exception is the DRAM/NAND market share in part 01, which cites TrendForce directly. Check the original sources before using any figure formally.</p>
+  </article>
+
+  <!-- ================= EN: MEMORY ================= -->
+  <article data-page="memory" data-lang="en" class="col" hidden>
+    <span class="eyebrow">Part 01 · Memory</span>
+    <h1>RAM and SSD: technology, types and the key memory players</h1>
+    <div class="meta"><span>16 Oct 2026</span><a class="src" href="https://claude.ai/artifact/SbCcnUjmNiEuDPVaAAvnJh" target="_blank" rel="noopener">Original document (Thai) ↗</a></div>
+
+    <h2 id="en-m-what">What RAM and SSD are, and what they do today</h2>
+    <p class="lede">RAM is the computer's desk; the SSD is its filing cabinet. RAM is very fast but forgets everything when the power goes off. An SSD is slower but keeps data permanently.</p>
+    <ul>
+      <li><strong>RAM (Random Access Memory)</strong> is the main memory where the CPU/GPU keeps the data and programs it is working on. It is mostly DRAM, which stores each bit as charge in a tiny capacitor, must be refreshed many times a second, and loses its data without power (volatile).</li>
+      <li><strong>SSD (Solid State Drive)</strong> is permanent storage built from NAND flash, which traps electrons in cells so data survives without power (non-volatile). Inside is a controller chip that spreads writes (wear leveling), corrects errors (ECC), and often has a small DRAM buffer.</li>
+    </ul>
+    <div class="table-wrap"><table>
+      <tr><th>Use</th><th>Role of RAM</th><th>Role of SSD</th></tr>
+      <tr><td>PC / laptop</td><td>Run many apps smoothly at once (typically 16–32 GB)</td><td>Fast boot and game loading (NVMe 1–2 TB)</td></tr>
+      <tr><td>Smartphone</td><td>LPDDR 8–16 GB for on-device AI and fast app switching</td><td>UFS for photos, video, apps</td></tr>
+      <tr><td>Data center / AI</td><td>HBM next to the GPU feeds AI models; DDR5 in servers</td><td>High-capacity enterprise SSDs (60–120 TB+) hold training data and databases</td></tr>
+      <tr><td>Cars</td><td>LPDDR in driver assistance and infotainment</td><td>Maps, software and camera data</td></tr>
+      <tr><td>Everyday devices</td><td>DRAM in TVs, routers, game consoles</td><td>eMMC/NAND in cameras, TVs, IoT, SD cards, flash drives</td></tr>
+    </table></div>
+    <p>The big trend of 2024–2026: AI has pushed demand for HBM and high-capacity enterprise SSDs so high that memory became a bottleneck for AI data centers, and ordinary DRAM/NAND prices rose with it.</p>
+
+    <h2 id="en-m-types">Types of RAM and SSD</h2>
+    <p>RAM is split by cell technology (SRAM/DRAM) and by usage standard. SSDs are split by bits per cell, interface and form factor.</p>
+    <h3>RAM types</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Type</th><th>Characteristics</th><th>Where it is used</th></tr>
+      <tr><td>SRAM</td><td>6 transistors per bit; very fast, no refresh, but expensive and large</td><td>Cache in CPUs/GPUs</td></tr>
+      <tr><td>DDR4 / DDR5</td><td>Standard DRAM for PCs and servers; DDR5 runs about 4800–8000+ MT/s</td><td>Desktops, laptops, servers (RDIMM)</td></tr>
+      <tr><td>LPDDR4X / LPDDR5X</td><td>Low-power DRAM soldered to the board</td><td>Phones, tablets, thin laptops, cars</td></tr>
+      <tr><td>GDDR6 / GDDR7</td><td>High-bandwidth DRAM for graphics</td><td>Graphics cards, game consoles</td></tr>
+      <tr><td>HBM (HBM3E / HBM4)</td><td>Many DRAM dies stacked with TSVs beside the GPU; TB/s bandwidth</td><td>AI accelerators such as NVIDIA, AMD, Google TPU</td></tr>
+      <tr><td>CXL Memory</td><td>Expands memory over the PCIe bus so several CPUs can share it</td><td>New data centers</td></tr>
+    </table></div>
+    <h3>SSD types</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Dimension</th><th>Options</th><th>Difference</th></tr>
+      <tr><td>NAND cell</td><td>SLC (1 bit), MLC (2), TLC (3), QLC (4), PLC (5, in research)</td><td>More bits = more capacity and cheaper, but slower with fewer write cycles</td></tr>
+      <tr><td>Structure</td><td>2D NAND → 3D NAND (200–300+ layers)</td><td>Stack higher instead of shrinking cells</td></tr>
+      <tr><td>Interface</td><td>SATA (~550 MB/s), NVMe PCIe 4.0 (~7 GB/s), PCIe 5.0 (~14 GB/s)</td><td>NVMe is many times faster than SATA</td></tr>
+      <tr><td>Form factor</td><td>2.5-inch, M.2, U.2/U.3, E1.S/E3.S, BGA chip</td><td>Depends on the machine: PC, laptop, server</td></tr>
+      <tr><td>Market segment</td><td>Client, Enterprise, Data center, Embedded (UFS/eMMC)</td><td>Enterprise focuses on endurance and steady latency</td></tr>
+    </table></div>
+
+    <h2 id="en-m-cache">How they differ from cache</h2>
+    <p>Cache is a small SRAM memory inside the CPU chip itself. It keeps copies of data from RAM that was just used or is about to be used, so the CPU does not wait for RAM, which is tens of times slower. The three do not compete; they work as layers.</p>
+    <figure>
+      <div class="chart-title">Cache sits closest to the CPU: fastest but smallest</div>
+      <div class="stack pyramid">
+        <div class="lvl"><b>Registers in the CPU</b><span>A few KB · under 1 ns</span></div>
+        <div class="lvl hot"><b>Cache L1 / L2 / L3 (SRAM on the CPU)</b><span>KB to tens of MB · about 1–40 ns</span></div>
+        <div class="lvl"><b>RAM (DRAM: DDR5, LPDDR5X, HBM)</b><span>8–128 GB · about 80–100 ns · lost at power-off</span></div>
+        <div class="lvl"><b>SSD (NAND Flash)</b><span>0.5–8 TB · about 20–100 µs · permanent</span></div>
+        <div class="lvl"><b>HDD / cloud</b><span>Many TB · several ms · cheapest per GB</span></div>
+      </div>
+      <figcaption>Memory hierarchy, approximate values for a typical computer. Lower tiers hold more, cost less and are slower.</figcaption>
+    </figure>
+    <p>When the CPU needs data it checks the cache first (a cache hit). If it is not there it goes to RAM, and if RAM does not have it, it loads from the SSD. "Cache" is also used more loosely, for example the DRAM cache or SLC cache inside an SSD, a fast area that holds data before it is written to the real NAND.</p>
+    <div class="table-wrap"><table>
+      <tr><th>Point</th><th>Cache</th><th>RAM</th><th>SSD</th></tr>
+      <tr><td>Technology</td><td>SRAM</td><td>DRAM</td><td>NAND Flash</td></tr>
+      <tr><td>Location</td><td>Inside the CPU/GPU chip</td><td>Modules on the motherboard, or beside the GPU (HBM)</td><td>M.2 / 2.5-inch drive</td></tr>
+      <tr><td>Managed by</td><td>Hardware, automatically</td><td>Operating system</td><td>File system + SSD controller</td></tr>
+      <tr><td>After power-off</td><td>Lost</td><td>Lost</td><td>Kept</td></tr>
+      <tr><td>User-upgradable?</td><td>No (replace the CPU)</td><td>Yes, if not soldered</td><td>Yes</td></tr>
+    </table></div>
+
+    <h2 id="en-m-market">Market overview and key players</h2>
+    <p>The DRAM market in Q2 2026 was worth about $154.7 billion, up 59.5% from the previous quarter. NAND revenue for the top five alone was about $68.9 billion, up 77%, because supply could not keep up with AI server demand and prices surged. It is an oligopoly, since a single fab costs tens of billions of dollars.</p>
+    <h3>DRAM, Q2 2026 (Apr–Jun)</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Company</th><th>Country</th><th class="num">Revenue (USD bn)</th><th class="num">Share (%)</th></tr>
+      <tr><td>Samsung</td><td>South Korea</td><td class="num">60.98</td><td class="num">39.4</td></tr>
+      <tr><td>SK hynix</td><td>South Korea</td><td class="num">38.59</td><td class="num">24.9</td></tr>
+      <tr><td>Micron</td><td>USA</td><td class="num">36.00</td><td class="num">23.3</td></tr>
+      <tr><td>CXMT</td><td>China</td><td class="num">14.62</td><td class="num">9.5</td></tr>
+      <tr><td>Nanya</td><td>Taiwan</td><td class="num">2.61</td><td class="num">1.7</td></tr>
+      <tr><td>Winbond and others</td><td>Taiwan, etc.</td><td class="num">1.92</td><td class="num">1.2</td></tr>
+    </table></div>
+    <p class="meta">Source: <a href="https://evertiq.com/news/2026-09-07-dram-industry-revenue-surges-595-in-q2-as-supply-lags-demand" target="_blank" rel="noopener">TrendForce via Evertiq</a></p>
+    <h3>NAND, Q2 2026</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Company</th><th>Country</th><th class="num">Revenue (USD bn)</th><th>Note</th></tr>
+      <tr><td>Samsung</td><td>South Korea</td><td class="num">23.06</td><td>29.3% share, #1</td></tr>
+      <tr><td>SK hynix + Solidigm</td><td>South Korea / USA</td><td class="num">14.27</td><td>Enterprise QLC selling well</td></tr>
+      <tr><td>Micron</td><td>USA</td><td class="num">11.85</td><td>Fastest growth, +99%, up to #3</td></tr>
+      <tr><td>Kioxia</td><td>Japan</td><td class="num">10.72</td><td>13.6% share</td></tr>
+      <tr><td>SanDisk</td><td>USA</td><td class="num">8.97</td><td>Spun off from WD in 2025</td></tr>
+    </table></div>
+    <p class="meta">Source: <a href="https://www.trendforce.com/presscenter/news/20260818-13186.html" target="_blank" rel="noopener">TrendForce</a></p>
+    <p>Beyond the chipmakers there is YMTC (China), a fast-growing NAND maker, and module brands that buy chips to build RAM and SSDs, such as Kingston, ADATA, Corsair, G.Skill and Lexar, the names people usually see in computer shops.</p>
+
+    <h2 id="en-m-companies">Company profiles</h2>
+    <p>Every one of them survived with the same recipe: invest against the cycle when the market is down, and stick close to big customers who are about to grow. The history below is summarized from general knowledge; years and amounts are approximate.</p>
+    <div class="cards">
+      <div class="card"><h3>Samsung Electronics</h3><span class="tagline">South Korea · largest maker of both DRAM and NAND</span><dl>
+        <dt>History</dt><dd>In 1983 chairman Lee Byung-chul announced the move into chips (the "Tokyo Declaration") and a 64Kb DRAM followed the same year. #1 in DRAM since 1992 and in NAND since 2002. In 2013 it was first to mass-produce 3D NAND (V-NAND).</dd>
+        <dt>Values</dt><dd>People, Excellence, Change, Integrity, Co-prosperity, and Lee Kun-hee's 1993 line "change everything except your wife and children".</dd>
+        <dt>Research</dt><dd>HBM4/HBM4E, DDR5 and LPDDR5X on 1c nm, high-layer V-NAND, CXL memory, processing-in-memory (PIM).</dd>
+        <dt>Crises and timing</dt><dd>Invested more during the 2007–2012 downturn (the "chicken game") until rivals Qimonda (2009) and Elpida (2012) failed. In 2024–2025 it was slow to pass NVIDIA's HBM qualification and briefly lost DRAM #1 to SK hynix, then regained the lead in Q2 2026 with fast HBM4 production.</dd>
+        <dt>Customers</dt><dd>Every segment, from consumer SSDs (990/9100 Pro) and its own Galaxy phones to data centers. Its strength is capacity and vertical integration (memory + foundry + packaging).</dd>
+        <dt>Partners</dt><dd>NVIDIA, AMD, Google, Apple, Microsoft, Tesla, ASML</dd>
+      </dl></div>
+      <div class="card"><h3>SK hynix</h3><span class="tagline">South Korea · the HBM leader</span><dl>
+        <dt>History</dt><dd>Started in 1983 as Hyundai Electronics, merged with LG Semicon in 1999 after the Asian financial crisis, became Hynix in 2001 and was bought by SK Group in 2012. Co-developed the first HBM with AMD in 2013.</dd>
+        <dt>Values</dt><dd>The SKMS philosophy of employee and social happiness, and VWBE (voluntary, willing brain engagement). Positions itself as a "Full Stack AI Memory Provider".</dd>
+        <dt>Research</dt><dd>12-high HBM3E / HBM4, MR-MUF packaging, 321-layer NAND, CXL, SOCAMM, AI-specific memory.</dd>
+        <dt>Crises and timing</dt><dd>Nearly failed in 2001–2005 and survived through debt restructuring. After SK arrived in 2012 it bet on HBM while the market was small, became NVIDIA's main HBM supplier in the 2023 ChatGPT wave, and took the DRAM lead for the first time in 2025. Buying Intel's NAND business (now Solidigm) in 2021 paid off when AI needed high-capacity SSDs.</dd>
+        <dt>Customers</dt><dd>Mainly AI data centers, then phones and PCs; consumer SSDs under SK hynix Platinum and Solidigm.</dd>
+        <dt>Partners</dt><dd>NVIDIA, TSMC (HBM4 base die), AMD, OpenAI (Stargate), SanDisk (High Bandwidth Flash standard)</dd>
+      </dl></div>
+      <div class="card"><h3>Micron Technology</h3><span class="tagline">USA · America's only memory maker</span><dl>
+        <dt>History</dt><dd>Founded in 1978 in Boise, Idaho, backed by J.R. Simplot. Grew through acquisitions such as Texas Instruments' DRAM business (1998), Numonyx (2010) and Elpida (2013). CEO Sanjay Mehrotra co-founded SanDisk.</dd>
+        <dt>Values</dt><dd>People, Innovation, Tenacity, Collaboration, Customer focus; mission "transform how the world uses information to enrich life for all".</dd>
+        <dt>Research</dt><dd>1-gamma DRAM with EUV, power-efficient HBM3E/HBM4, server LPDDR5X (SOCAMM), G9 NAND, automotive-grade memory.</dd>
+        <dt>Crises and timing</dt><dd>Survived Japanese price-cutting around 1985 (won a dumping case), turned the 2012 crisis into a cheap Elpida purchase, was banned in China in 2023 but received CHIPS Act funding for fabs in Idaho and New York. In late 2025 it announced it would exit the Crucial consumer brand to focus capacity on AI customers.</dd>
+        <dt>Customers</dt><dd>Cloud/data center, enterprise, mobile and PC, automotive and embedded (leader in automotive memory).</dd>
+        <dt>Partners</dt><dd>NVIDIA, AMD, Intel, Apple, carmakers, and the governments of the US, Japan (Hiroshima fab) and Taiwan</dd>
+      </dl></div>
+      <div class="card"><h3>Kioxia</h3><span class="tagline">Japan · inventor of flash memory</span><dl>
+        <dt>History</dt><dd>Came from Toshiba, where Fujio Masuoka invented flash in 1984 and NAND in 1987. Spun out as Toshiba Memory in 2017, sold to a Bain Capital consortium (with SK hynix) in 2018, renamed Kioxia in 2019, and listed in Tokyo in December 2024.</dd>
+        <dt>Values</dt><dd>"Uplifting the world with memory"; the name joins kioku (memory) and axia (value).</dd>
+        <dt>Research</dt><dd>BiCS 3D NAND (BiCS8 uses CBA: cells and control circuits made on separate wafers then bonded), AI SSDs, OCTRAM, flash linked directly to GPUs.</dd>
+        <dt>Crises and timing</dt><dd>Was sold off because Toshiba lost heavily on Westinghouse. In the 2023 NAND slump it cut output by about 30%, and its merger with WD failed, so it listed when the market recovered in late 2024 instead.</dd>
+        <dt>Customers</dt><dd>NAND for phone makers (e.g. Apple), enterprise and data-center SSDs, cards and flash drives.</dd>
+        <dt>Partners</dt><dd>SanDisk (joint Yokkaichi and Kitakami fabs for 20+ years), Bain Capital, Toshiba, Japanese government</dd>
+      </dl></div>
+      <div class="card"><h3>SanDisk</h3><span class="tagline">USA · the flash brand people know</span><dl>
+        <dt>History</dt><dd>Founded in 1988 by Eli Harari, Sanjay Mehrotra and Jack Yuan; pioneered CompactFlash and SD cards. Western Digital bought it in 2016 for about $19 billion and spun it off again in February 2025, leaving WD with hard drives only.</dd>
+        <dt>Values</dt><dd>Innovation and patents (thousands of flash patents), and making storage accessible to everyone.</dd>
+        <dt>Research</dt><dd>BiCS NAND (with Kioxia), very high-capacity SSDs, High Bandwidth Flash (HBF), stacking NAND like HBM to keep AI models near the GPU.</dd>
+        <dt>Crises and timing</dt><dd>Early on it had no fab, so it earned patent royalties and shared fab risk with Toshiba. It spun off in 2025 just before AI sent NAND prices soaring.</dd>
+        <dt>Customers</dt><dd>Consumers (SD cards, USB, portable SSDs, WD_BLACK), PC/phone makers, data centers.</dd>
+        <dt>Partners</dt><dd>Kioxia, SK hynix (HBF standard), Nintendo, retailers worldwide</dd>
+      </dl></div>
+      <div class="card"><h3>Solidigm</h3><span class="tagline">USA (SK hynix subsidiary) · high-capacity QLC SSDs</span><dl>
+        <dt>History</dt><dd>Formed in December 2021 from Intel's NAND and SSD business, which SK hynix bought for about $9 billion. Headquartered in California, main fab in Dalian, China.</dd>
+        <dt>Values</dt><dd>A mix of Intel-style engineering and SK philosophy, focused on being a storage partner for enterprise customers.</dd>
+        <dt>Research</dt><dd>61.44 TB and 122.88 TB QLC SSDs, liquid-cooled SSDs.</dd>
+        <dt>Crises and timing</dt><dd>Lost heavily in 2022–2023 but kept betting on high-capacity QLC. When AI data centers needed huge, power-efficient storage in 2024–2026, its drives sold out.</dd>
+        <dt>Customers</dt><dd>Cloud providers and AI data centers.</dd>
+        <dt>Partners</dt><dd>SK hynix, NVIDIA, Dell, HPE, Supermicro</dd>
+      </dl></div>
+      <div class="card"><h3>CXMT (ChangXin Memory)</h3><span class="tagline">China · the fastest-growing DRAM challenger</span><dl>
+        <dt>History</dt><dd>Founded in 2016 in Hefei, Anhui, with local government money and the national chip fund. Started from old Qimonda patents, made DDR4 by 2019, and now makes DDR5 and LPDDR5X.</dd>
+        <dt>Values</dt><dd>Its core mission is Chinese self-reliance in memory under state policy (inferred from its funding).</dd>
+        <dt>Research</dt><dd>Shrinking without EUV, fast DDR5/LPDDR5X, early HBM for Chinese AI chips.</dd>
+        <dt>Crises and timing</dt><dd>Restricted from US tools, it focused on the large home market. In Q2 2026 revenue rose 99% and share reached 9.5%, because the big three moved capacity to HBM.</dd>
+        <dt>Customers</dt><dd>Chinese phone and PC makers (Xiaomi, Lenovo, Transsion), Chinese cloud.</dd>
+        <dt>Partners</dt><dd>Hefei local government, the Big Fund, Chinese tool makers</dd>
+      </dl></div>
+      <div class="card"><h3>YMTC (Yangtze Memory)</h3><span class="tagline">China · NAND challenger with Xtacking</span><dl>
+        <dt>History</dt><dd>Founded in 2016 in Wuhan by Tsinghua Unigroup and state funds. Jumped from 32 layers to 128 and then 200+ within a few years.</dd>
+        <dt>Values</dt><dd>Home-grown innovation and Chinese supply-chain security.</dd>
+        <dt>Research</dt><dd>Xtacking architecture, making cells and control circuits on separate wafers then bonding them (an idea the big players have started to follow), and domestic tools.</dd>
+        <dt>Crises and timing</dt><dd>Its parent defaulted in 2020, and YMTC was put on the US Entity List in December 2022, so Apple dropped plans to use its chips. It survived with more state money and Chinese tools (share figures not verified).</dd>
+        <dt>Customers</dt><dd>Chinese SSD brands (e.g. ZhiTai), Chinese phone and PC makers, budget module brands.</dd>
+        <dt>Partners</dt><dd>The Big Fund, Hubei government, Naura and AMEC</dd>
+      </dl></div>
+    </div>
+
+    <h2 id="en-m-lessons">Shared lessons</h2>
+    <p>The memory market runs a boom-and-bust cycle every 3–4 years. The winners have enough cash to invest in the downturn and bet on the right technology before the demand arrives.</p>
+    <ol>
+      <li><strong>Invest against the cycle:</strong> Samsung and Micron grew when rivals failed (Qimonda, Elpida). Those who cut investment in the downturn usually miss the next upturn.</li>
+      <li><strong>Bet before the market comes:</strong> SK hynix made HBM from 2013 when it barely sold, and Solidigm bet on high-capacity QLC. Both cashed in when AI arrived.</li>
+      <li><strong>Stay close to growing customers:</strong> the most important partners now are NVIDIA and TSMC, since HBM is designed and packaged together with the GPU.</li>
+      <li><strong>Move capacity to high margins:</strong> Micron dropped Crucial and the big makers cut DDR4, so consumer RAM and SSDs got pricier and Chinese and Taiwanese players found room.</li>
+      <li><strong>Geopolitics shapes the game:</strong> state money (CHIPS Act, Big Fund, Japan) and US export controls matter as much as technology.</li>
+    </ol>
+    <p class="note"><b>For everyday users and tinkerers:</b> buy enough RAM for what you run at once (16 GB for general use, 32 GB for video editing or small AI models). Choose a TLC NVMe SSD if you write a lot, and QLC for cheap bulk storage. Check which chips are actually inside and the TBW (warrantied write volume).</p>
+    <p class="meta">Company histories and values are summarized from general knowledge; check the companies' websites before citing them.</p>
+
+    <nav class="pager"><a href="#home"><span>← Previous</span>Home</a><a class="next" href="#design"><span>Next →</span>How advanced chips are designed</a></nav>
+  </article>
+
+  <!-- ================= EN: DESIGN ================= -->
+  <article data-page="design" data-lang="en" class="col" hidden>
+    <span class="eyebrow">Part 02 · Chip design</span>
+    <h1>How advanced chips are designed: tools, teams and yearly gains</h1>
+    <div class="meta"><span>23 Oct 2026</span><a class="src" href="https://claude.ai/artifact/BALvMkobQoktDzTiC5kB57" target="_blank" rel="noopener">Original document (Thai) ↗</a></div>
+
+    <h2 id="en-d-summary">Summary</h2>
+    <p class="lede">Chips like the A19 Pro, M5, Threadripper or the GB10 in DGX Spark are not drawn one transistor at a time. They are written as hardware code (such as SystemVerilog), and EDA (Electronic Design Automation) software turns that code into tens of billions of transistors automatically. Three companies dominate EDA: Synopsys, Cadence and Siemens EDA.</p>
+    <p>Teams are split by stage of work: architecture, logic design (RTL), verification, physical design, analog and memory circuits, software and firmware, and silicon testing. The verification team is often bigger than the design team.</p>
+    <p>Chips improve every year from four sources at once: (1) new manufacturing processes from foundries such as TSMC, (2) smarter architecture, (3) multi-die packaging (chiplets), and (4) co-design between the chip team, the foundry and software teams.</p>
+    <p>Limits are found with data, not guesses. Architects run real software on models of the next chip, measure where the bottleneck is, and weigh the three variables of <strong>PPA</strong>: Performance, Power and Area (area equals cost). The main limits today are heat and power, the memory wall, and rapidly rising manufacturing cost.</p>
+
+    <h2 id="en-d-eda">Chip design software (EDA)</h2>
+    <p>Nearly every chip company mixes tools from the three big vendors and adds in-house tools. Apple, AMD and NVIDIA do not publish full lists, but job postings, conference talks and vendor partnership news point to the tools below.</p>
+    <div class="table-wrap wide"><table>
+      <tr><th>Stage</th><th>What it does</th><th>Synopsys</th><th>Cadence</th><th>Siemens EDA</th></tr>
+      <tr><td>Simulation</td><td>Runs hardware code cycle by cycle to find bugs</td><td>VCS</td><td>Xcelium</td><td>Questa</td></tr>
+      <tr><td>Formal verification</td><td>Proves mathematically that the circuit cannot fail</td><td>VC Formal</td><td>Jasper</td><td>Questa Formal</td></tr>
+      <tr><td>Emulation / prototyping</td><td>Runs the design on special hardware fast enough to boot an OS</td><td>ZeBu, HAPS</td><td>Palladium, Protium</td><td>Veloce</td></tr>
+      <tr><td>Logic synthesis</td><td>Turns RTL into gates from the foundry library</td><td>Design Compiler, Fusion Compiler</td><td>Genus</td><td>(not a strength)</td></tr>
+      <tr><td>Place and route</td><td>Places billions of gates and wires them on silicon</td><td>Fusion Compiler, IC Compiler II</td><td>Innovus</td><td>Aprisa</td></tr>
+      <tr><td>Timing signoff</td><td>Checks every signal arrives within the clock cycle</td><td>PrimeTime</td><td>Tempus</td><td>(exists, little used)</td></tr>
+      <tr><td>Power and thermal</td><td>Checks voltage drop, current, heat</td><td>PrimePower, RedHawk (from Ansys)</td><td>Voltus, Celsius</td><td>(partial)</td></tr>
+      <tr><td>Physical verification</td><td>Checks layout follows foundry rules (DRC/LVS)</td><td>IC Validator</td><td>Pegasus</td><td>Calibre (industry standard)</td></tr>
+      <tr><td>Analog and custom</td><td>Hand-drawn transistors for SRAM, PLL, SerDes</td><td>Custom Compiler</td><td>Virtuoso</td><td>(partial)</td></tr>
+      <tr><td>Design for test (DFT)</td><td>Adds circuits to test real chips after fabrication</td><td>TestMAX</td><td>Modus</td><td>Tessent</td></tr>
+      <tr><td>AI-assisted design</td><td>AI tunes tool settings or helps write/debug code</td><td>DSO.ai, Synopsys.ai</td><td>Cerebrus, JedAI</td><td>Solido</td></tr>
+    </table></div>
+    <p>Besides software you need the foundry's <strong>PDK</strong> (Process Design Kit), which defines the drawing rules and transistor behavior of a process such as TSMC N3P, and ready-made <strong>IP</strong> such as Arm cores (NVIDIA/MediaTek use Cortex-X925 in GB10) or LPDDR5X and PCIe controllers bought from Synopsys/Cadence. The main design language is SystemVerilog; testing uses UVM, C++ and Python.</p>
+    <p>These tools are very expensive. One seat of a signoff-grade tool costs hundreds of thousands to a million dollars a year, and one project runs on tens of thousands of server cores at once (estimates; vendors do not publish prices).</p>
+
+    <h2 id="en-d-flow">From spec to real silicon</h2>
+    <p>A flagship chip takes about 3–4 years from idea to shelf, so at any time a company has 3–4 generations in progress in parallel.</p>
+    <ol>
+      <li><strong>Set goals and architecture:</strong> choose core count, cache size, memory bandwidth and power budget (a few watts for a phone versus hundreds for Threadripper), and test with a performance model.</li>
+      <li><strong>Write RTL:</strong> describe every block's behavior in SystemVerilog, e.g. "every clock cycle, fetch four instructions and pass them on".</li>
+      <li><strong>Verify:</strong> simulate in software, prove with formal tools, and run on emulators to boot iOS/macOS/Linux before silicon exists, because a bug that reaches silicon costs tens of millions of dollars.</li>
+      <li><strong>Synthesize:</strong> turn RTL into a gate netlist from the standard-cell library.</li>
+      <li><strong>Physical design:</strong> floorplan, place gates, build the clock tree, and route many copper layers.</li>
+      <li><strong>Signoff:</strong> pass every timing, power, thermal and manufacturing check; if not, loop back to step 4 or 5 many times.</li>
+      <li><strong>Tape-out:</strong> send the layout (GDSII/OASIS) to the foundry to make masks. A 3nm chip needs dozens of masks, and the first wafers take about three months.</li>
+      <li><strong>Post-silicon bring-up:</strong> boot the real chip, find remaining bugs, tune voltage and frequency, and maybe fix some mask layers (respin).</li>
+    </ol>
+    <p>Steps 2–6 do not happen one after another; they loop together every week. Physical design starts trial layouts before the RTL is finished, to find problems as early as possible.</p>
+
+    <h2 id="en-d-teams">How teams are organized</h2>
+    <p>Big chip companies organize teams as a two-axis matrix: one axis is the block (CPU, GPU, NPU, memory, I/O), the other is the discipline in the table below.</p>
+    <div class="table-wrap"><table>
+      <tr><th>Team</th><th>Job</th><th>Key skills</th></tr>
+      <tr><td>Architecture / performance modeling</td><td>Decide what the chip should have; measure before building</td><td>Computer architecture, C++, statistics</td></tr>
+      <tr><td>Logic design (RTL / micro-architecture)</td><td>Write each block's digital logic</td><td>SystemVerilog, digital logic</td></tr>
+      <tr><td>Design verification</td><td>Find bugs before fabrication; often the largest team</td><td>UVM, formal, test programming</td></tr>
+      <tr><td>Physical design / implementation</td><td>Turn logic into a manufacturable layout</td><td>EDA tools, Tcl/Python, timing and power</td></tr>
+      <tr><td>Custom / analog / mixed-signal</td><td>SRAM, clock generators, power control, SerDes</td><td>Device physics, SPICE</td></tr>
+      <tr><td>DFT and production test</td><td>Add test circuits, screen bad chips, binning</td><td>Production test, yield statistics</td></tr>
+      <tr><td>Packaging and signal/power integrity</td><td>Design the package, connect dies, cooling</td><td>Electromagnetics, thermal</td></tr>
+      <tr><td>Software and firmware</td><td>Drivers, compilers, power management</td><td>C, operating systems</td></tr>
+      <tr><td>Post-silicon validation</td><td>Test real chips in the lab</td><td>Instruments, debugging</td></tr>
+      <tr><td>CAD / internal tools</td><td>Servers, licenses, automation scripts</td><td>Software, DevOps</td></tr>
+    </table></div>
+    <p>Chip teams at Apple, AMD and NVIDIA number in the thousands to tens of thousands of engineers, and one flagship chip may take several hundred to over a thousand (estimates from public data). Reuse is what makes this work: Apple uses the same core family in A19 Pro and M5, and AMD uses the same CCD die in Ryzen, Threadripper and EPYC.</p>
+
+    <h2 id="en-d-abstraction">From transistors to circuits with different jobs</h2>
+    <p>The secret that lets a few thousand people manage tens of billions of transistors is <strong>abstraction</strong>: each layer hides the detail below. CPU designers think in registers and datapaths and let tools translate downward.</p>
+    <figure>
+      <div class="chart-title">Transistors are built up layer by layer into a whole chip</div>
+      <div class="stack layers">
+        <div class="lvl"><span class="n">1</span><div><b>Transistor</b><span>A nanometer-scale electrical switch (FinFET, GAA), on or off by voltage</span></div></div>
+        <div class="lvl"><span class="n">2</span><div><b>Logic gate (standard cell)</b><span>NAND, NOR, flip-flop, made from a few to a few dozen transistors</span></div></div>
+        <div class="lvl"><span class="n">3</span><div><b>Basic circuits</b><span>Adders, multiplexers, registers, 6-transistor SRAM cells</span></div></div>
+        <div class="lvl"><span class="n">4</span><div><b>Functional blocks</b><span>ALU, instruction decoder, cache, matrix multiplier</span></div></div>
+        <div class="lvl"><span class="n">5</span><div><b>Cores and engines</b><span>CPU cores, GPU cores, NPU, video encoder</span></div></div>
+        <div class="lvl hot"><span class="n">6</span><div><b>Whole chip (SoC)</b><span>Many cores, shared cache, memory, I/O: tens of billions of transistors</span></div></div>
+      </div>
+    </figure>
+    <p>Most chips combine three methods:</p>
+    <ul>
+      <li><strong>Automated logic from standard cells:</strong> most of the logic. Foundries design thousands of ready-made gates, and tools pick and place them.</li>
+      <li><strong>Custom circuits:</strong> for heavily repeated, performance-critical parts such as cache SRAM cells and register files. Nearly half the die can be on-chip memory.</li>
+      <li><strong>Analog circuits:</strong> for parts that talk to the outside world, such as PLLs, voltage regulators, temperature sensors and high-speed I/O.</li>
+    </ul>
+    <p>Which circuit does which job is decided at the architecture level: decision-heavy general work goes to the CPU, graphics and parallel math to the GPU, AI matrix math to the NPU or Tensor Cores, and specific jobs to dedicated units (video encoding, camera processing), which use many times less energy than the CPU. That is why chips gain more dedicated units every year.</p>
+
+    <h2 id="en-d-yearly">Why chips get better every year</h2>
+    <p>Each year's progress comes from many levers at once. The share from "smaller transistors" keeps falling while architecture and packaging matter more.</p>
+    <div class="table-wrap"><table>
+      <tr><th>Lever</th><th>How</th><th>Real example</th></tr>
+      <tr><td>New process node</td><td>Smaller, denser transistors that use less power</td><td>TSMC N3E → N3P (A19 Pro, M5); next N2 moves from FinFET to GAA (nanosheet)</td></tr>
+      <tr><td>Micro-architecture</td><td>Wider CPUs, better branch prediction, bigger caches</td><td>AMD Zen 5 widens vector units to full 512-bit</td></tr>
+      <tr><td>Dedicated units</td><td>Move frequent work into special circuits</td><td>Apple Neural Accelerators in every GPU core; NVIDIA 5th-gen Tensor Cores in Blackwell with FP4</td></tr>
+      <tr><td>Memory system</td><td>More bandwidth, unified memory</td><td>GB10 shares 128 GB LPDDR5X between CPU and GPU</td></tr>
+      <tr><td>Packaging and chiplets</td><td>Split the chip into dies on different processes, joined in one package</td><td>Threadripper's CPU dies around an I/O die; GB10 joins CPU and GPU dies with NVLink-C2C</td></tr>
+      <tr><td>Design-technology co-optimization (DTCO)</td><td>Tune standard cells, rules and process together</td><td>Apple is first customer on almost every new TSMC node</td></tr>
+      <tr><td>Software and compilers</td><td>Let software use new hardware fully</td><td>Metal, Core ML, CUDA, ROCm</td></tr>
+      <tr><td>Better EDA and AI</td><td>Find better layouts than humans, faster</td><td>DSO.ai and Cerebrus use reinforcement learning</td></tr>
+    </table></div>
+    <p>The levers do not all move every year. A year with a new process may change the architecture less; a year on the same process focuses on architecture instead, similar to Intel's old "tick-tock" rhythm.</p>
+
+    <h2 id="en-d-limits">Limits, and how teams find what to improve</h2>
+    <p>Every decision trades off PPA. More cache is faster, but the chip gets bigger and more expensive.</p>
+    <h3>Finding the bottleneck</h3>
+    <ol>
+      <li><strong>Collect traces of real software:</strong> games, browsers, compiling, AI models and benchmarks (SPEC CPU, Geekbench, MLPerf).</li>
+      <li><strong>Run them on an architecture model</strong> to see where time goes, such as waiting for memory or mispredicted branches (top-down analysis).</li>
+      <li><strong>Read performance counters from current chips</strong> in real use and compare with competitors.</li>
+      <li><strong>Try changes in the model,</strong> e.g. double the cache, and compare the score gain with the extra area and power.</li>
+      <li><strong>Assess physical design early:</strong> which blocks miss frequency targets or are too congested.</li>
+      <li><strong>Learn from real silicon:</strong> measure heat, leakage and yield, and feed it into the next generation.</li>
+    </ol>
+    <h3>The main limits today</h3>
+    <div class="table-wrap"><table>
+      <tr><th>Limit</th><th>What happens</th><th>Current fixes</th></tr>
+      <tr><td>Heat and power (power wall)</td><td>Voltage barely drops, so heat per area rises; not everything can be on at once (dark silicon)</td><td>P/E cores, power gating, dedicated units, vapor chambers</td></tr>
+      <tr><td>Memory wall</td><td>Compute grows faster than memory bandwidth, especially for AI</td><td>Bigger caches, 3D V-Cache, unified memory, HBM</td></tr>
+      <tr><td>SRAM stops shrinking</td><td>From about 5nm SRAM cells barely shrink, so cache gets relatively costly</td><td>Move cache to a separate die on a cheaper process</td></tr>
+      <tr><td>Copper wires and power delivery</td><td>Thin wires have high resistance; signal and power wires compete for space</td><td>Backside power, e.g. TSMC A16, Intel 18A</td></tr>
+      <tr><td>Reticle limit</td><td>One exposure prints only about 800 mm²</td><td>Chiplets and 2.5D/3D packaging (CoWoS, SoIC)</td></tr>
+      <tr><td>Yield and cost</td><td>Large dies hit defects more often; 3nm wafers are very expensive</td><td>Many small dies, spare cores, binning</td></tr>
+      <tr><td>Verification complexity</td><td>Too many possible states to test them all</td><td>Formal, emulators, reusing proven blocks</td></tr>
+    </table></div>
+    <p>Chip teams do not start from "where can we add transistors?" but from "where does the user's real work get stuck?", and then spend the transistor budget there.</p>
+
+    <h2 id="en-d-cases">Case study: four chips</h2>
+    <p>The four chips show three approaches: Apple builds one monolithic, power-efficient die; AMD joins many small dies for lots of cores at a controlled cost; NVIDIA and MediaTek combine dies from two companies in one package.</p>
+    <div class="table-wrap wide"><table>
+      <tr><th>Chip</th><th>Designer / fab</th><th>Structure</th><th>Main parts</th><th>What improved</th></tr>
+      <tr><td>Apple A19 Pro (iPhone 17 Pro, 2025)</td><td>Apple / TSMC N3P</td><td>Single die</td><td>6-core CPU (2+4), 6-core GPU, 16-core Neural Engine</td><td>Neural Accelerator in every GPU core, more cache, vapor chamber</td></tr>
+      <tr><td>Apple M5 (MacBook Pro, iPad Pro, 2025)</td><td>Apple / TSMC N3P</td><td>Single die + unified memory</td><td>Up to 10-core CPU, 10-core GPU, 16-core Neural Engine, ~153 GB/s</td><td>Same core family as A19, more cores and power budget</td></tr>
+      <tr><td>AMD Threadripper 9000 / PRO 9000 WX (2025)</td><td>AMD / TSMC N4P + N6</td><td>Chiplets: several 8-core CCDs around an I/O die</td><td>Up to 96 Zen 5 cores, 8-channel DDR5, PCIe 5.0</td><td>Wider Zen 5; same CCD as Ryzen/EPYC</td></tr>
+      <tr><td>NVIDIA GB10 Grace Blackwell (DGX Spark, 2025)</td><td>NVIDIA + MediaTek / TSMC 3nm</td><td>2 dies joined by NVLink-C2C</td><td>20-core Arm CPU (10 X925 + 10 A725), Blackwell GPU, 128 GB LPDDR5X</td><td>Data-center superchip shrunk to a desktop, ~1 petaFLOP at FP4</td></tr>
+    </table></div>
+    <p>GB10 uses a CPU die from MediaTek and a GPU die from NVIDIA, a good example of teams split across companies. Both had to agree the die-to-die interface early, then develop their own dies in parallel.</p>
+
+    <h2 id="en-d-diy">If you want to try it yourself</h2>
+    <p>Commercial tools are far too expensive for individuals, but open-source tools now cover the same flow, from RTL to a real fabricated chip.</p>
+    <div class="table-wrap"><table>
+      <tr><th>Step</th><th>Free tools</th><th>Professional equivalent</th></tr>
+      <tr><td>Write and simulate</td><td>Icarus Verilog, Verilator, GTKWave, cocotb</td><td>VCS, Xcelium, Questa</td></tr>
+      <tr><td>Try on real hardware</td><td>An FPGA board for a few thousand baht + Yosys/nextpnr</td><td>Palladium, HAPS</td></tr>
+      <tr><td>Synthesis and layout</td><td>Yosys + OpenROAD via OpenLane / LibreLane</td><td>Fusion Compiler, Genus + Innovus</td></tr>
+      <tr><td>Layout checks</td><td>Magic, KLayout, Netgen</td><td>Calibre, IC Validator</td></tr>
+      <tr><td>Open PDKs</td><td>SkyWater SKY130, GF180MCU, IHP SG13G2</td><td>TSMC N3P (NDA customers only)</td></tr>
+      <tr><td>Fabricate a real chip</td><td>Tiny Tapeout: shared chip area, a few hundred dollars</td><td>Full 3nm tape-out: tens of millions of dollars</td></tr>
+    </table></div>
+    <h3>Suggested path</h3>
+    <ol>
+      <li>Learn digital logic and build a computer from NAND gates with Nand2Tetris (free).</li>
+      <li>Write Verilog/SystemVerilog and test with Verilator + cocotb.</li>
+      <li>Build a small RISC-V CPU and run it on an FPGA board.</li>
+      <li>Submit a small design to Tiny Tapeout and get a real chip you designed.</li>
+    </ol>
+    <p class="note"><b>Note:</b> compiled from public announcements by Apple, AMD, NVIDIA, MediaTek, TSMC and the EDA vendors up to mid-2026, without re-checking every figure. Chip specs are approximate; team sizes and license prices are estimates from public data.</p>
+
+    <nav class="pager"><a href="#memory"><span>← Previous</span>RAM and SSD</a><a class="next" href="#market"><span>Next →</span>Chips by function and supply vs demand</a></nav>
+  </article>
+
+  <!-- ================= EN: MARKET ================= -->
+  <article data-page="market" data-lang="en" class="col" hidden>
+    <span class="eyebrow">Part 03 · Industry overview</span>
+    <h1>Chips by function, how they are built, and supply vs demand</h1>
+    <div class="meta"><span>4 Nov 2026</span><a class="src" href="https://claude.ai/artifact/BC9RnuwBxh6GctMUpo5Mpc" target="_blank" rel="noopener">Original document (Thai) ↗</a></div>
+
+    <h2 id="en-k-overview">Overview</h2>
+    <p class="lede">Chips fall into about a dozen categories by the problem they solve (compute, store, convert signals, deliver power, communicate, sense, and so on). All are built on the same base: transistors on a wafer. In 2026 the tightest supply is in HBM, advanced packaging (CoWoS) and 3nm/2nm nodes, pulled by AI demand, while mature-node chips (MCU, power, analog) have swung back to oversupply and balance.</p>
+    <p class="note"><b>About the numbers:</b> market and capacity figures here are estimates from public reports up to mid-2026 (TrendForce, WSTS, Yole, TSMC/SK hynix/NVIDIA financials), not yet confirmed against original pages. Use them for direction and scale, not for financial reference.</p>
+
+    <h2 id="en-k-types">Chip categories by function</h2>
+    <p>Every chip answers one question before design: "what will it move, store, convert or control?" That answer sets its material, node and architecture. Shares are rough estimates of the 2026 global chip market (about $700 billion).</p>
+    <div class="table-wrap wide"><table>
+      <tr><th>Category</th><th>Problem solved</th><th>Examples</th><th>Node / material</th><th class="num">Market share</th></tr>
+      <tr><td>General compute (CPU)</td><td>Varied work, fast decisions</td><td>x86, Arm, RISC-V</td><td>2–5nm</td><td class="num">~10%</td></tr>
+      <tr><td>Parallel compute (GPU / AI accelerator / NPU)</td><td>Huge amounts of matrix math for AI and graphics</td><td>NVIDIA Blackwell/Rubin, AMD MI, Google TPU</td><td>3–4nm + HBM + CoWoS</td><td class="num">~30%, fastest growing</td></tr>
+      <tr><td>Memory (DRAM / HBM / NAND)</td><td>Keep data near compute, and permanently</td><td>DDR5, LPDDR5X, HBM3E/HBM4, 3D NAND</td><td>1b/1c nm DRAM, 200–300+ layer NAND</td><td class="num">~25–30%</td></tr>
+      <tr><td>Mobile / device SoC</td><td>CPU, GPU, NPU and modem on one power-efficient chip</td><td>Apple A/M, Snapdragon, Dimensity</td><td>3nm</td><td class="num">~8%</td></tr>
+      <tr><td>MCU / embedded</td><td>Control appliances, cars, sensors cheaply on little power</td><td>STM32, ESP32, RP2040/RP2350</td><td>28–90nm</td><td class="num">~4%</td></tr>
+      <tr><td>Analog / mixed-signal</td><td>Turn the real world into digital, amplify signals</td><td>ADC/DAC, op-amp, PMIC</td><td>65–180nm, BCD</td><td class="num">~12%</td></tr>
+      <tr><td>Power semiconductors</td><td>Switch and convert high-voltage power</td><td>MOSFET, IGBT, SiC, GaN</td><td>8-inch SiC, GaN-on-Si</td><td class="num">~5%</td></tr>
+      <tr><td>RF / wireless</td><td>Send and receive 5G, Wi-Fi, satellite</td><td>PA, LNA, filters, transceivers</td><td>GaAs, GaN, RF-SOI</td><td class="num">~3%</td></tr>
+      <tr><td>Sensors / MEMS / opto</td><td>Sense light, force, motion; emit light</td><td>CMOS image sensors, IMU, LiDAR, LED, lasers</td><td>28–65nm, InP, GaN</td><td class="num">~5%</td></tr>
+      <tr><td>Reconfigurable / custom</td><td>FPGA rewires after fabrication; ASIC is fastest for one job</td><td>AMD/Xilinx, Lattice, bitcoin miners</td><td>Various</td><td class="num">~2%</td></tr>
+      <tr><td>Security / connectivity</td><td>Store keys, authenticate, move data fast</td><td>Secure element, TPM, SerDes, switches</td><td>5–40nm</td><td class="num">in other categories</td></tr>
+      <tr><td>Experimental</td><td>Problems normal computers solve very slowly, or brain-like computing</td><td>Quantum, neuromorphic, photonic</td><td>Superconducting, silicon photonics</td><td class="num">&lt;1%</td></tr>
+    </table></div>
+    <p>For home experiments the easiest categories are MCUs, sensors and FPGAs. Designing your own ASIC is possible through Tiny Tapeout on open PDKs (SKY130, GF180).</p>
+
+    <h2 id="en-k-layers">How a chip is built, from base to architecture</h2>
+    <p>Every category starts from transistors on a wafer; the differences are higher up. AI chips focus on layers 4–5 and 7 (matrix blocks + HBM + CoWoS), while power chips focus on layers 1–2 (SiC/GaN materials that withstand high voltage).</p>
+    <figure>
+      <div class="chart-title">One chip is a stack of 8 layers, from sand to software</div>
+      <div class="stack layers">
+        <div class="lvl"><span class="n">1</span><div><b>Materials and wafer</b><span>Quartz sand → 99.9999999% pure silicon → Czochralski crystal → 300 mm wafer (or SiC, GaN, GaAs for power and RF)</span></div></div>
+        <div class="lvl hot"><span class="n">2</span><div><b>Transistor: an electrically controlled switch</b><span>Planar → FinFET (22–3nm) → GAA / nanosheet (2nm, 2025–26) → stacked CFET (target after 2030)</span></div></div>
+        <div class="lvl"><span class="n">3</span><div><b>Gates and standard cells</b><span>4–6 CMOS transistors form NAND, NOR, flip-flops and SRAM cells, collected into each node's standard-cell library</span></div></div>
+        <div class="lvl"><span class="n">4</span><div><b>Circuit blocks (IP)</b><span>ALU, matrix multiplier, cache, memory controller, PHY, SerDes, ADC, bought or designed in-house</span></div></div>
+        <div class="lvl"><span class="n">5</span><div><b>Architecture</b><span>ISA (x86, Arm, RISC-V) + micro-architecture: pipeline, core count, memory hierarchy, NoC</span></div></div>
+        <div class="lvl"><span class="n">6</span><div><b>Fab (front-end)</b><span>Lithography (EUV), etch, deposition, ion implant, CMP, repeated for 60–100 mask layers, 1,000+ steps, about 3–4 months</span></div></div>
+        <div class="lvl"><span class="n">7</span><div><b>Packaging and test (back-end)</b><span>Wire-bond, flip-chip → 2.5D (CoWoS) → 3D hybrid bonding, and chiplets joined by the UCIe standard</span></div></div>
+        <div class="lvl"><span class="n">8</span><div><b>System and software</b><span>Board, cooling, power, firmware, compilers and libraries (such as CUDA) that put the chip to real use</span></div></div>
+      </div>
+      <figcaption>Manufacturing goes from the bottom up; design thinks from the spec down.</figcaption>
+    </figure>
+    <p>The real design order runs opposite to manufacturing:</p>
+    <ol>
+      <li><strong>Spec:</strong> define the problem, power budget (W), price and volume.</li>
+      <li><strong>Architecture:</strong> choose ISA, cores, memory, and simulate with a performance model.</li>
+      <li><strong>RTL:</strong> write the circuit in Verilog/SystemVerilog/VHDL and verify it (verification takes about 50–60% of project effort).</li>
+      <li><strong>Synthesis + place &amp; route:</strong> map to the foundry's gates, place and wire, output GDSII.</li>
+      <li><strong>Tape-out:</strong> the foundry makes masks and wafers, then dicing, packaging and testing.</li>
+      <li><strong>Bring-up:</strong> power on the first chip, write firmware and drivers, fix bugs.</li>
+    </ol>
+    <p>Details on tools, teams and costs are in <a href="#design">part 02</a>.</p>
+
+    <h2 id="en-k-supply">Supply and demand by segment</h2>
+    <p>In 2026 every link in the AI chain is still short (supply about 86–91% of demand), with HBM and CoWoS as the main bottlenecks, while mature nodes are about 8–14% oversupplied thanks to new capacity in China. The chart uses the supply-to-demand (sufficiency) ratio so every segment fits one scale, since each is counted in different units (wafers, bits, pieces).</p>
+    <figure>
+      <div class="chart-title">HBM and CoWoS supply stays below demand until 2027, while mature nodes are oversupplied</div>
+      <div class="chart-wrap"><svg data-chart="supply" role="img" aria-label="Supply-to-demand ratio for six segments, 2023 to 2028"></svg></div>
+      <figcaption>Supply-to-demand ratio (%): below 100 = shortage, above 100 = oversupply · dashed line = CoWoS · shaded band = projection · author's estimates from trends in TrendForce, Yole, WSTS and TSMC/SK hynix/NVIDIA reports up to mid-2026, not official figures</figcaption>
+    </figure>
+    <div class="table-wrap wide"><table>
+      <tr><th>Segment</th><th>Demand comes from</th><th>Supply bottleneck</th><th>2026 market size</th><th>Main suppliers</th></tr>
+      <tr><td>AI accelerators</td><td>Hyperscaler and sovereign-AI data centers</td><td>Limited by HBM, CoWoS, data-center power</td><td class="num">~$250–350B</td><td>NVIDIA, AMD, Broadcom/Google, Marvell</td></tr>
+      <tr><td>HBM</td><td>Each AI chip uses 8–12 HBM stacks</td><td>Slow to make (3× the die area of DRAM per bit, TSV yield)</td><td class="num">~$50–60B</td><td>SK hynix, Samsung, Micron</td></tr>
+      <tr><td>3nm/2nm nodes</td><td>AI chips, phone SoCs, data-center CPUs</td><td>EUV tools (ASML only), $20B+ per fab</td><td class="num">~$80–100B</td><td>TSMC 90%+, Samsung, Intel 18A</td></tr>
+      <tr><td>CoWoS / advanced packaging</td><td>GPU + HBM must sit on one interposer</td><td>About 90–110k wafers/month by late 2026</td><td class="num">~$50–60B</td><td>TSMC, ASE/SPIL, Amkor, Intel Foveros</td></tr>
+      <tr><td>Commodity DRAM/NAND</td><td>PCs, phones, AI server SSDs</td><td>Capacity shifted to HBM; sharp price rises</td><td class="num">~$200B+</td><td>Samsung, SK hynix, Micron, Kioxia, YMTC, CXMT</td></tr>
+      <tr><td>Mature nodes / MCU / power</td><td>EVs, industry, appliances</td><td>Not short; China's 28nm+ expansion pushes prices down</td><td class="num">~$120B+</td><td>TI, Infineon, ST, NXP, SMIC, Hua Hong</td></tr>
+    </table></div>
+    <p>The lesson from the chart is that the bottleneck moves. In 2023 CoWoS was shortest; in 2026 it is HBM, spreading to commodity DRAM. After 2027 the next bottleneck is likely data-center power and cooling, not the chips themselves.</p>
+
+    <h2 id="en-k-frontier">What is not yet discovered or not yet economical</h2>
+    <p>The industry has two big goals. Short term (to about 2030): about 10× better performance per watt for AI chips. Long term (2035 and beyond): computing that is not limited by power and heat. Most technologies are past halfway to the short-term goal, but almost all are below 20% of the long-term one.</p>
+    <figure>
+      <div class="chart-title">Only backside power is halfway to its long-term goal; the rest are at 20% or less</div>
+      <div class="chart-wrap"><svg data-chart="frontier" role="img" aria-label="Progress of 12 technologies against short- and long-term goals"></svg></div>
+      <figcaption>Progress against goal (%), the author's assessment from public roadmaps (imec, TSMC, Intel, IBM, ASML) as of Nov 2026, not an official metric</figcaption>
+    </figure>
+    <p><span class="tag no-find">Not yet discovered</span> physics or process not ready &nbsp; <span class="tag no-pay">Not yet economical</span> possible, but cost or yield not there &nbsp; <span class="tag ok">Starting to pay off</span></p>
+    <div class="table-wrap wide"><table>
+      <tr><th>Technology</th><th>Status</th><th>Why it matters</th><th>Main obstacle</th><th>Short-term goal</th><th>Long-term goal</th></tr>
+      <tr><td>Error-corrected quantum</td><td><span class="tag no-find">Not discovered</span></td><td>Simulate molecules, drugs, materials</td><td>Qubits decohere fast; thousands of physical qubits per logical qubit</td><td>~100 logical qubits</td><td>Millions of qubits doing useful work</td></tr>
+      <tr><td>Neuromorphic / analog in-memory</td><td><span class="tag no-find">Not discovered</span></td><td>Tens of times less energy for AI</td><td>Low precision, no software support</td><td>Commercial edge chips</td><td>AI at brain-level power (~20 W)</td></tr>
+      <tr><td>2D materials replacing silicon channels</td><td><span class="tag no-find">Not discovered</span></td><td>Keep shrinking after silicon hits its limit</td><td>Growing defect-free crystals on 300 mm wafers</td><td>Pilot-line testing</td><td>Used in nodes after 2035</td></tr>
+      <tr><td>CFET stacked transistors</td><td><span class="tag no-pay">Not economical</span></td><td>1.5–2× density after GAA</td><td>Very complex process</td><td>Circuits on full wafers</td><td>Production around 2032–34</td></tr>
+      <tr><td>High-NA EUV</td><td><span class="tag no-pay">Not economical</span></td><td>Print finer patterns in one pass</td><td>About $350–400M per tool</td><td>Used at ~1.4nm (2027–28)</td><td>Hyper-NA after 2030</td></tr>
+      <tr><td>Backside power delivery</td><td><span class="tag ok">Paying off</span></td><td>Power wires on the back; less voltage drop</td><td>Harder cooling and debugging</td><td>Intel 18A, TSMC A16 in production</td><td>Standard on all advanced nodes</td></tr>
+      <tr><td>HBM4 / near-memory compute</td><td><span class="tag no-pay">Not economical (PIM)</span></td><td>Break the memory wall</td><td>16-high stacking yield, high cost per bit</td><td>HBM4 in volume in 2026</td><td>Compute inside ordinary memory</td></tr>
+      <tr><td>3D hybrid bonding</td><td><span class="tag no-pay">Not economical</span></td><td>Tightly stacked chips, short wires, low power</td><td>Nano-level surface cleanliness, heat build-up</td><td>HBM and SoIC use hybrid bonding</td><td>Logic-on-logic everywhere</td></tr>
+      <tr><td>Co-packaged optics / photonics</td><td><span class="tag no-pay">Not economical</span></td><td>Move data with light at far less power per bit</td><td>Laser cost, hard to service</td><td>CPO switches in data centers</td><td>Optical I/O between ordinary chips</td></tr>
+      <tr><td>Cross-vendor chiplet market (UCIe)</td><td><span class="tag no-pay">Not economical</span></td><td>Small companies build big chips from parts</td><td>Who is liable when it fails; known-good-die testing</td><td>Mixed-vendor chiplets in real products</td><td>Buy chiplets like IP</td></tr>
+      <tr><td>Glass substrate</td><td><span class="tag no-pay">Not economical</span></td><td>Bigger packages without warping</td><td>Glass breaks easily; drilling TGVs</td><td>Pilot use in AI chips</td><td>Replace organic material in large packages</td></tr>
+      <tr><td>Open-source chips / open PDKs</td><td><span class="tag no-pay">Not economical (commercially)</span></td><td>Anyone, students and small countries can design chips</td><td>Open PDKs only at 130–180nm</td><td>Tape-outs for a few hundred dollars each</td><td>Open PDKs at 28nm and below</td></tr>
+    </table></div>
+    <p>For people who want to build something, the open-source chip row is the only one ordinary people can join today: design a small digital circuit in Verilog and fabricate it through Tiny Tapeout, or start with an FPGA for a few hundred baht.</p>
+
+    <h2 id="en-k-sources">Sources to check against</h2>
+    <ul>
+      <li>Total and per-category chip market: <a href="https://www.wsts.org/" target="_blank" rel="noopener">WSTS</a> and <a href="https://www.semiconductors.org/" target="_blank" rel="noopener">SIA</a></li>
+      <li>HBM, DRAM, NAND, CoWoS supply and demand: <a href="https://www.trendforce.com/" target="_blank" rel="noopener">TrendForce</a></li>
+      <li>Advanced packaging and power (SiC/GaN): <a href="https://www.yolegroup.com/" target="_blank" rel="noopener">Yole Group</a></li>
+      <li>Advanced-node and CoWoS capacity: <a href="https://investor.tsmc.com/" target="_blank" rel="noopener">TSMC Investor Relations</a></li>
+      <li>AI chip and HBM revenue: <a href="https://investor.nvidia.com/" target="_blank" rel="noopener">NVIDIA</a> and <a href="https://www.skhynix.com/ir/" target="_blank" rel="noopener">SK hynix</a></li>
+      <li>Transistor roadmaps: <a href="https://www.imec-int.com/" target="_blank" rel="noopener">imec</a> and <a href="https://irds.ieee.org/" target="_blank" rel="noopener">IRDS</a></li>
+      <li>Open-source chips: <a href="https://tinytapeout.com/" target="_blank" rel="noopener">Tiny Tapeout</a></li>
+    </ul>
+
+    <nav class="pager"><a href="#design"><span>← Previous</span>How advanced chips are designed</a><a class="next" href="#home"><span>Back →</span>Home</a></nav>
+  </article>
+  </main>
+</div>
+
+<script>
+(function () {
+  var NS = "http://www.w3.org/2000/svg";
+  function el(tag, attrs, text) {
+    var e = document.createElementNS(NS, tag);
+    for (var k in attrs) e.setAttribute(k, attrs[k]);
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  /* ---------- chart 1: supply / demand ratio ---------- */
+  var supply = [
+    { th: "ชิปเร่ง AI (GPU/ASIC)", en: "AI accelerators (GPU/ASIC)", v: [60, 80, 90, 88, 95, 99] },
+    { th: "HBM", en: "HBM", v: [95, 90, 92, 86, 94, 101], hot: true },
+    { th: "CoWoS / แพ็กเกจขั้นสูง", en: "CoWoS / advanced packaging", v: [70, 80, 87, 89, 96, 100], hot: true, dash: true },
+    { th: "โหนด 3nm/2nm", en: "3nm/2nm nodes", v: [105, 98, 93, 91, 95, 97] },
+    { th: "DRAM/NAND ทั่วไป", en: "Commodity DRAM/NAND", v: [115, 102, 97, 92, 98, 104] },
+    { th: "โหนดเก่า 28nm+ / MCU / power", en: "Mature 28nm+ / MCU / power", v: [108, 114, 112, 108, 110, 112] }
+  ];
+  function drawSupply(svg, lang) {
+    var W = 760, H = 420, x0 = 52, x1 = 500, y0 = 30, yb = 380, lo = 50, hi = 120;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    var X = function (i) { return x0 + i / 5 * (x1 - x0); };
+    var Y = function (v) { return yb - (v - lo) / (hi - lo) * (yb - y0); };
+    svg.appendChild(el("rect", { x: X(3), y: y0 - 18, width: X(5) - X(3), height: yb - y0 + 18, fill: "var(--accent-soft)" }));
+    svg.appendChild(el("text", { x: X(3) + 6, y: y0 - 5, "font-size": 11.5, fill: "var(--muted)" }, lang === "en" ? "Estimate / projection" : "ประมาณการ / คาดการณ์"));
+    [50, 60, 70, 80, 90, 100, 110, 120].forEach(function (t) {
+      svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(t), y2: Y(t), stroke: "var(--line)" }));
+      svg.appendChild(el("text", { x: x0 - 8, y: Y(t) + 4, "text-anchor": "end", "font-size": 11.5, fill: "var(--muted)" }, t));
+    });
+    for (var i = 0; i < 6; i++) svg.appendChild(el("text", { x: X(i), y: yb + 22, "text-anchor": "middle", "font-size": 11.5, fill: "var(--muted)" }, 2023 + i));
+    svg.appendChild(el("line", { x1: x0, x2: x1, y1: Y(100), y2: Y(100), stroke: "var(--copper)", "stroke-width": 1.5, "stroke-dasharray": "5 4" }));
+    svg.appendChild(el("text", { x: X(0.15), y: Y(100) - 6, "font-size": 11.5, fill: "var(--copper)" }, lang === "en" ? "100 = balanced" : "100 = สมดุล"));
+    var order = supply.filter(function (s) { return !s.hot; }).concat(supply.filter(function (s) { return s.hot; }));
+    order.forEach(function (s) {
+      var c = s.hot ? "var(--accent)" : "var(--chart-muted)";
+      var d = s.v.map(function (v, i) { return (i ? "L" : "M") + X(i) + " " + Y(v); }).join("");
+      svg.appendChild(el("path", { d: d, fill: "none", stroke: c, "stroke-width": s.hot ? 2.5 : 1.5, "stroke-dasharray": s.dash ? "7 4" : "none" }));
+      s.v.forEach(function (v, i) {
+        var dot = el("circle", { cx: X(i), cy: Y(v), r: s.hot ? 3.5 : 2.5, fill: c });
+        dot.appendChild(el("title", {}, s[lang] + (lang === "en" ? " in " : " ปี ") + (2023 + i) + ": " + v + "%"));
+        svg.appendChild(dot);
+      });
+    });
+    var ends = supply.map(function (s) { return { s: s, v: s.v[5] }; }).sort(function (a, b) { return Y(a.v) - Y(b.v); });
+    var prev = -1e9;
+    ends.forEach(function (e) {
+      var y = Math.max(Y(e.v), prev + 17); prev = y;
+      svg.appendChild(el("line", { x1: x1 + 5, x2: x1 + 14, y1: Y(e.v), y2: y, stroke: "var(--line)" }));
+      svg.appendChild(el("text", { x: x1 + 18, y: y + 4, "font-size": 11.5, "font-weight": e.s.hot ? 600 : 400, fill: e.s.hot ? "var(--ink)" : "var(--muted)" }, e.s[lang] + " " + e.v + "%"));
+    });
+  }
+
+  /* ---------- chart 2: frontier progress ---------- */
+  var frontier = [
+    ["Backside power delivery", "Backside power delivery", 85, 50],
+    ["HBM4 / หน่วยความจำใกล้ตัวคำนวณ", "HBM4 / near-memory compute", 75, 15],
+    ["CFET ทรานซิสเตอร์ซ้อน", "CFET stacked transistors", 60, 20],
+    ["ชิป open-source / PDK เปิด", "Open-source chips / open PDKs", 60, 15],
+    ["High-NA EUV ในการผลิต", "High-NA EUV in production", 55, 15],
+    ["Hybrid bonding 3D", "3D hybrid bonding", 50, 20],
+    ["Co-packaged optics / photonics", "Co-packaged optics / photonics", 45, 15],
+    ["ตลาด chiplet ข้ามค่าย (UCIe)", "Cross-vendor chiplets (UCIe)", 35, 10],
+    ["Glass substrate", "Glass substrate", 30, 10],
+    ["วัสดุ 2D แทน channel ซิลิคอน", "2D materials for channels", 30, 5],
+    ["Neuromorphic / analog in-memory", "Neuromorphic / analog in-memory", 20, 5],
+    ["Quantum แก้ error ได้จริง", "Error-corrected quantum", 20, 3]
+  ];
+  function drawFrontier(svg, lang) {
+    var li = lang === "en" ? 1 : 0;
+    var xa = 270, xb = 730, y0 = 64, rh = 30, W = 760, H = y0 + frontier.length * rh + 30;
+    svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+    var X = function (v) { return xa + v / 100 * (xb - xa); };
+    var Y = function (i) { return y0 + i * rh; };
+    svg.appendChild(el("circle", { cx: 20, cy: 20, r: 5, fill: "var(--accent)" }));
+    svg.appendChild(el("text", { x: 32, y: 24, "font-size": 11.5, fill: "var(--ink)" }, li ? "Short-term goal (to ~2030)" : "เป้าระยะสั้น (ถึงราว 2030)"));
+    svg.appendChild(el("circle", { cx: 230, cy: 20, r: 5, fill: "var(--surface)", stroke: "var(--chart-muted)", "stroke-width": 2 }));
+    svg.appendChild(el("text", { x: 242, y: 24, "font-size": 11.5, fill: "var(--ink)" }, li ? "Long-term goal (2035+)" : "เป้าระยะยาว (2035 ขึ้นไป)"));
+    var yEnd = Y(frontier.length - 1) + 14;
+    [0, 25, 50, 75, 100].forEach(function (t) {
+      svg.appendChild(el("line", { x1: X(t), x2: X(t), y1: y0 - 16, y2: yEnd, stroke: t === 50 ? "var(--copper)" : "var(--line)", "stroke-dasharray": t === 50 ? "4 4" : "none" }));
+      svg.appendChild(el("text", { x: X(t), y: yEnd + 16, "text-anchor": "middle", "font-size": 11.5, fill: "var(--muted)" }, t + "%"));
+    });
+    frontier.forEach(function (r, i) {
+      var name = r[li];
+      svg.appendChild(el("text", { x: xa - 14, y: Y(i) + 4, "text-anchor": "end", "font-size": 12, fill: "var(--ink)" }, name));
+      svg.appendChild(el("line", { x1: X(r[3]), x2: X(r[2]), y1: Y(i), y2: Y(i), stroke: "var(--line)", "stroke-width": 3 }));
+      var l = el("circle", { cx: X(r[3]), cy: Y(i), r: 5, fill: "var(--surface)", stroke: "var(--chart-muted)", "stroke-width": 2 });
+      l.appendChild(el("title", {}, name + (li ? " long-term: " : " เป้าระยะยาว: ") + r[3] + "%")); svg.appendChild(l);
+      var s = el("circle", { cx: X(r[2]), cy: Y(i), r: 5.5, fill: "var(--accent)" });
+      s.appendChild(el("title", {}, name + (li ? " short-term: " : " เป้าระยะสั้น: ") + r[2] + "%")); svg.appendChild(s);
+    });
+  }
+  document.querySelectorAll("svg[data-chart]").forEach(function (svg) {
+    var lang = svg.closest("article").getAttribute("data-lang");
+    (svg.getAttribute("data-chart") === "supply" ? drawSupply : drawFrontier)(svg, lang);
+  });
+
+  /* ---------- language ---------- */
+  var lang = "th";
+  try { var saved = localStorage.getItem("st-lang"); if (saved === "en" || saved === "th") lang = saved; } catch (e) {}
+  var langBtn = document.getElementById("lang-toggle");
+  function applyLang() {
+    document.body.setAttribute("data-lang", lang);
+    document.documentElement.setAttribute("lang", lang);
+    langBtn.querySelectorAll("span").forEach(function (s) { s.classList.toggle("on", s.getAttribute("data-l") === lang); });
+    langBtn.setAttribute("aria-label", lang === "en" ? "เปลี่ยนเป็นภาษาไทย" : "Switch to English");
+  }
+  langBtn.addEventListener("click", function () {
+    lang = lang === "th" ? "en" : "th";
+    try { localStorage.setItem("st-lang", lang); } catch (e) {}
+    applyLang(); show(true);
+  });
+
+  /* ---------- routing ---------- */
+  var pages = ["home", "memory", "design", "market"];
+  var tocWrap = document.getElementById("toc-wrap"), toc = document.getElementById("toc");
+  var heads = [];
+  function show(keepScroll) {
+    var h = (location.hash || "").replace("#", "");
+    if (pages.indexOf(h) < 0) h = "home";
+    document.querySelectorAll("article[data-page]").forEach(function (a) {
+      a.hidden = !(a.getAttribute("data-page") === h && a.getAttribute("data-lang") === lang);
+    });
+    document.querySelectorAll("#nav a").forEach(function (a) {
+      if (a.getAttribute("data-page") === h) { a.setAttribute("aria-current", "page"); var n = a.parentNode; if (n.scrollWidth > n.clientWidth) n.scrollLeft = a.offsetLeft - 16; } else a.removeAttribute("aria-current");
+    });
+    var art = document.querySelector('article[data-page="' + h + '"][data-lang="' + lang + '"]');
+    document.title = h === "home" ? "Semiconductors Tinkering" : art.querySelector("h1").textContent.split(":")[0] + " · Semiconductors Tinkering";
+    toc.innerHTML = "";
+    heads = Array.prototype.slice.call(art.querySelectorAll("h2[id]"));
+    heads.forEach(function (hd) {
+      var b = document.createElement("button");
+      b.type = "button"; b.textContent = hd.textContent; b.dataset.target = hd.id;
+      b.addEventListener("click", function () { hd.scrollIntoView({ block: "start" }); });
+      toc.appendChild(b);
+    });
+    tocWrap.hidden = heads.length === 0;
+    if (keepScroll !== true) window.scrollTo(0, 0);
+    spy();
+  }
+  function spy() {
+    var cur = null;
+    heads.forEach(function (hd) { if (hd.getBoundingClientRect().top < 140) cur = hd.id; });
+    if (!cur && heads.length) cur = heads[0].id;
+    toc.querySelectorAll("button").forEach(function (b) { b.classList.toggle("on", b.dataset.target === cur); });
+  }
+  window.addEventListener("hashchange", function () { show(); });
+  window.addEventListener("scroll", spy, { passive: true });
+  applyLang();
+  show();
+})();
+</script>
+
+</body>
+</html>
